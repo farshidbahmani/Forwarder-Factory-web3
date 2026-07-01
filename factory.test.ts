@@ -27,13 +27,13 @@ describe("ForwarderFactory", () => {
 
   // ────────────────────────────────────────────
   describe("getAddress", () => {
-    it("آدرس کاربر قبل از deploy باید قابل پیش‌بینی باشد", async () => {
+    it("should return a predictable address before deploy", async () => {
       const predicted = await factory.getAddress(USER_ID);
       expect(predicted).to.be.properAddress;
       expect(await ethers.provider.getCode(predicted)).to.equal("0x");
     });
 
-    it("دو userId متفاوت باید آدرس متفاوت بدن", async () => {
+    it("different userIds should produce different addresses", async () => {
       const addr1 = await factory.getAddress(1n);
       const addr2 = await factory.getAddress(2n);
       expect(addr1).to.not.equal(addr2);
@@ -42,7 +42,7 @@ describe("ForwarderFactory", () => {
 
   // ────────────────────────────────────────────
   describe("deployAndSweepBNB", () => {
-    it("باید BNB را به مادر والت sweep کند", async () => {
+    it("should sweep BNB to the mother wallet", async () => {
       const userWallet = await factory.getAddress(USER_ID);
       await user.sendTransaction({ to: userWallet, value: ethers.parseEther("1") });
 
@@ -53,7 +53,7 @@ describe("ForwarderFactory", () => {
       expect(after - before).to.equal(ethers.parseEther("1"));
     });
 
-    it("دومین sweep باید بدون deploy مجدد کار کند", async () => {
+    it("second sweep should work without redeploying", async () => {
       const userWallet = await factory.getAddress(USER_ID);
 
       await user.sendTransaction({ to: userWallet, value: ethers.parseEther("1") });
@@ -65,7 +65,7 @@ describe("ForwarderFactory", () => {
       ).to.not.emit(factory, "WalletDeployed");
     });
 
-    it("غیر relayer نباید بتواند sweep کند", async () => {
+    it("non-relayer should not be able to sweep", async () => {
       await expect(
         factory.connect(attacker).deployAndSweepBNB(USER_ID)
       ).to.be.revertedWith("Factory: not relayer");
@@ -74,7 +74,7 @@ describe("ForwarderFactory", () => {
 
   // ────────────────────────────────────────────
   describe("deployAndSweepToken", () => {
-    it("باید توکن BEP20 را به مادر والت sweep کند", async () => {
+    it("should sweep BEP20 tokens to the mother wallet", async () => {
       const userWallet = await factory.getAddress(USER_ID);
       await token.mint(userWallet, ethers.parseUnits("100", 18));
 
@@ -88,7 +88,7 @@ describe("ForwarderFactory", () => {
 
   // ────────────────────────────────────────────
   describe("emergencyWithdraw", () => {
-    it("Owner باید بتواند BNB را اضطراری برداشت کند", async () => {
+    it("Owner should be able to emergency withdraw BNB", async () => {
       const userWallet = await factory.getAddress(USER_ID);
       await user.sendTransaction({ to: userWallet, value: ethers.parseEther("1") });
       await factory.connect(relayer).deployWallet(USER_ID);
@@ -97,10 +97,10 @@ describe("ForwarderFactory", () => {
       await factory.connect(owner).emergencyWithdrawBNB(USER_ID, owner.address);
       const after  = await ethers.provider.getBalance(owner.address);
 
-      expect(after).to.be.gt(before); // کمی گس کم می‌شه ولی پول می‌رسه
+      expect(after).to.be.gt(before); // some gas is spent, but funds arrive
     });
 
-    it("غیر Owner نباید emergency withdraw کند", async () => {
+    it("non-Owner should not be able to emergency withdraw", async () => {
       const userWallet = await factory.getAddress(USER_ID);
       await user.sendTransaction({ to: userWallet, value: ethers.parseEther("1") });
       await factory.connect(relayer).deployWallet(USER_ID);
@@ -113,17 +113,17 @@ describe("ForwarderFactory", () => {
 
   // ────────────────────────────────────────────
   describe("Timelock - Mother Wallet", () => {
-    it("تغییر فوری motherWallet باید ناموفق باشد", async () => {
+    it("immediate motherWallet change should fail", async () => {
       await factory.connect(owner).requestMotherWalletChange(attacker.address);
       await expect(
         factory.connect(owner).applyMotherWalletChange()
       ).to.be.revertedWith("Factory: timelock active");
     });
 
-    it("بعد از ۴۸ ساعت باید اعمال شود", async () => {
+    it("should apply after 48 hours", async () => {
       await factory.connect(owner).requestMotherWalletChange(attacker.address);
 
-      // شبیه‌سازی گذشت ۴۸ ساعت روی شبکه local
+      // Simulate 48 hours passing on the local network
       await ethers.provider.send("evm_increaseTime", [48 * 60 * 60 + 1]);
       await ethers.provider.send("evm_mine", []);
 
@@ -131,7 +131,7 @@ describe("ForwarderFactory", () => {
       expect(await factory.motherWallet()).to.equal(attacker.address);
     });
 
-    it("لغو تغییر باید کار کند", async () => {
+    it("cancelling a pending change should work", async () => {
       await factory.connect(owner).requestMotherWalletChange(attacker.address);
       await factory.connect(owner).cancelMotherWalletChange();
       expect(await factory.pendingMotherWallet()).to.equal(ethers.ZeroAddress);
@@ -140,7 +140,7 @@ describe("ForwarderFactory", () => {
 
   // ────────────────────────────────────────────
   describe("updateRelayer", () => {
-    it("فقط owner بتونه relayer رو عوض کنه", async () => {
+    it("only owner should be able to change the relayer", async () => {
       await expect(
         factory.connect(attacker).updateRelayer(attacker.address)
       ).to.be.revertedWith("Factory: not owner");

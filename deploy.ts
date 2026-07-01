@@ -1,24 +1,46 @@
 import { ethers, run, network } from "hardhat";
 
+// Native currency symbol per network — used only for display
+const NATIVE_SYMBOL: Record<string, string> = {
+  bscMainnet:      "BNB",
+  bscTestnet:      "tBNB",
+  opBNB:           "BNB",
+  ethereum:        "ETH",
+  sepolia:         "ETH",
+  polygon:         "MATIC",
+  polygonAmoy:     "MATIC",
+  arbitrum:        "ETH",
+  arbitrumSepolia: "ETH",
+  optimism:        "ETH",
+  optimismSepolia: "ETH",
+  base:            "ETH",
+  baseSepolia:     "ETH",
+  avalanche:       "AVAX",
+  avalancheFuji:   "AVAX",
+  hardhat:         "ETH",
+};
+
 async function main() {
   const MOTHER_WALLET = process.env.MOTHER_WALLET;
-  const RELAYER      = process.env.RELAYER_ADDRESS;
+  const RELAYER       = process.env.RELAYER_ADDRESS;
 
   if (!MOTHER_WALLET || !RELAYER) {
-    throw new Error("MOTHER_WALLET و RELAYER_ADDRESS رو در .env تنظیم کن");
+    throw new Error("Set MOTHER_WALLET and RELAYER_ADDRESS in .env before deploying");
   }
 
-  console.log(`\nDeploy روی شبکه: ${network.name}`);
-  console.log(`Mother Wallet : ${MOTHER_WALLET}`);
-  console.log(`Relayer       : ${RELAYER}\n`);
+  const symbol = NATIVE_SYMBOL[network.name] ?? "ETH";
+
+  console.log(`\nDeploying to network : ${network.name}`);
+  console.log(`Mother Wallet        : ${MOTHER_WALLET}`);
+  console.log(`Relayer              : ${RELAYER}\n`);
 
   const [deployer] = await ethers.getSigners();
-  console.log(`Deployer      : ${deployer.address}`);
-  const balance = await ethers.provider.getBalance(deployer.address);
-  console.log(`Balance       : ${ethers.formatEther(balance)} BNB\n`);
+  const balance    = await ethers.provider.getBalance(deployer.address);
+  console.log(`Deployer : ${deployer.address}`);
+  console.log(`Balance  : ${ethers.formatEther(balance)} ${symbol}\n`);
 
-  // ── Deploy ──────────────────────────────────
-  console.log("در حال deploy کردن ForwarderFactory...");
+  // ── Deploy ──────────────────────────────────────────────────
+  console.log("Deploying ForwarderFactory...");
   const Factory = await ethers.getContractFactory("ForwarderFactory");
   const factory = await Factory.deploy(MOTHER_WALLET, RELAYER);
   await factory.waitForDeployment();
@@ -29,30 +51,32 @@ async function main() {
   console.log(`✅ ForwarderFactory : ${factoryAddress}`);
   console.log(`✅ Implementation   : ${implementationAddress}\n`);
 
-  // ── Verify روی BscScan (فقط برای testnet/mainnet) ──
-  if (network.name !== "hardhat" && network.name !== "localhost") {
-    console.log("در حال verify کردن روی BscScan (30 ثانیه صبر کن...)");
-    await new Promise((r) => setTimeout(r, 30_000)); // صبر تا indexer آماده بشه
+  // ── Verify on block explorer (skip for local networks) ──────
+  const isLocal = network.name === "hardhat" || network.name === "localhost";
+  if (!isLocal) {
+    console.log("Verifying on block explorer (waiting 30s for indexer)...");
+    await new Promise((r) => setTimeout(r, 30_000));
 
     try {
       await run("verify:verify", {
         address: factoryAddress,
         constructorArguments: [MOTHER_WALLET, RELAYER],
       });
-      console.log("✅ Factory verified روی BscScan");
+      console.log("✅ Verified on block explorer");
     } catch (e: any) {
       if (e.message.includes("Already Verified")) {
-        console.log("ℹ️  قبلاً verify شده بود");
+        console.log("ℹ️  Contract was already verified");
       } else {
-        console.warn("⚠️  Verify ناموفق:", e.message);
+        console.warn("⚠️  Verification failed:", e.message);
       }
     }
   }
 
-  // ── خلاصه نهایی ──────────────────────────────
+  // ── Summary ─────────────────────────────────────────────────
+  const envKey = `FACTORY_ADDRESS_${network.name.toUpperCase()}`;
   console.log("\n══════════════════════════════════════════");
-  console.log("این مقادیر رو در .env پروژه Backend ذخیره کن:");
-  console.log(`FACTORY_ADDRESS=${factoryAddress}`);
+  console.log("Save this in your backend .env:");
+  console.log(`${envKey}=${factoryAddress}`);
   console.log("══════════════════════════════════════════\n");
 }
 
