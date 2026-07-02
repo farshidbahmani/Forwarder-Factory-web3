@@ -49,16 +49,23 @@ The user **never pays gas**. The relayer pays gas for the sweep transaction.
 
 ## Supported Networks
 
-| Network | Chain ID | Testnet |
+| Network Key (Project Config) | Type | Chain ID |
 |---|---|---|
-| BNB Chain | 56 | BSC Testnet (97) |
-| opBNB | 204 | — |
-| Ethereum | 1 | Sepolia (11155111) |
-| Polygon | 137 | Amoy (80002) |
-| Arbitrum | 42161 | Arbitrum Sepolia (421614) |
-| Optimism | 10 | Optimism Sepolia (11155420) |
-| Base | 8453 | Base Sepolia (84532) |
-| Avalanche C-Chain | 43114 | Fuji (43113) |
+| `bscMainnet` | __Mainnet__ | 56 |
+| `bscTestnet` | __Testnet__ | 97 |
+| `opBNBMainnet` | __Mainnet__ | 204 |
+| `ethereumMainnet` | __Mainnet__ | 1 |
+| `sepoliaTestnet` | __Testnet__ | 11155111 |
+| `polygonMainnet` | __Mainnet__ | 137 |
+| `polygonAmoyTestnet` | __Testnet__ | 80002 |
+| `arbitrumMainnet` | __Mainnet__ | 42161 |
+| `arbitrumSepoliaTestnet` | __Testnet__ | 421614 |
+| `optimismMainnet` | __Mainnet__ | 10 |
+| `optimismSepoliaTestnet` | __Testnet__ | 11155420 |
+| `baseMainnet` | __Mainnet__ | 8453 |
+| `baseSepoliaTestnet` | __Testnet__ | 84532 |
+| `avalancheMainnet` | __Mainnet__ | 43114 |
+| `avalancheFujiTestnet` | __Testnet__ | 43113 |
 
 ---
 
@@ -72,7 +79,7 @@ bnb-forwarder/
 │   └── MockBEP20.sol          # Test token (local only)
 ├── scripts/
 │   ├── deploy.ts              # Deploy Factory to any network
-│   └── wallet.ts              # CLI tools for wallet management
+│   └── createWallet.ts        # CLI tools for per-network wallet generation
 ├── test/
 │   └── factory.test.ts        # Hardhat tests
 ├── hardhat.config.ts
@@ -115,23 +122,24 @@ Always deploy to testnet first and verify everything works before mainnet.
 **Testnet:**
 ```bash
 npm run deploy:bscTestnet
-npm run deploy:sepolia
-npm run deploy:polygonAmoy
-npm run deploy:arbitrumSepolia
-npm run deploy:optimismSepolia
-npm run deploy:baseSepolia
-npm run deploy:avalancheFuji
+npm run deploy:sepoliaTestnet
+npm run deploy:polygonAmoyTestnet
+npm run deploy:arbitrumSepoliaTestnet
+npm run deploy:optimismSepoliaTestnet
+npm run deploy:baseSepoliaTestnet
+npm run deploy:avalancheFujiTestnet
 ```
 
 **Mainnet (after testnet verification):**
 ```bash
 npm run deploy:bscMainnet
-npm run deploy:ethereum
-npm run deploy:polygon
-npm run deploy:arbitrum
-npm run deploy:optimism
-npm run deploy:base
-npm run deploy:avalanche
+npm run deploy:opBNBMainnet
+npm run deploy:ethereumMainnet
+npm run deploy:polygonMainnet
+npm run deploy:arbitrumMainnet
+npm run deploy:optimismMainnet
+npm run deploy:baseMainnet
+npm run deploy:avalancheMainnet
 ```
 
 After each deploy, save the Factory address in your backend `.env`:
@@ -142,23 +150,38 @@ FACTORY_ADDRESS_POLYGON=0x...
 
 ---
 
-## Wallet CLI
+## Wallet CLI (per network)
+
+Use the wallet generator to create dedicated deployer/relayer/mother wallets for each network.
 
 ```bash
-# Print Factory info (owner, relayer, motherWallet)
-npx hardhat run scripts/wallet.ts --network bscTestnet
+# List supported networks
+npm run wallet:list
 
-# Get deposit address for user 1
-npx hardhat run scripts/wallet.ts --network bscTestnet -- address 1
+# Generate wallets for a single network
+npm run wallet:create -- --network=bscTestnet
+npm run wallet:create -- --network=ethereumMainnet
 
-# Get addresses for multiple users at once
-npx hardhat run scripts/wallet.ts --network bscTestnet -- batch 1 2 3 4 5
+# Generate wallets for all networks at once
+npm run wallet:all-networks
 
-# Sweep BNB for user 1
-npx hardhat run scripts/wallet.ts --network bscTestnet -- sweepBNB 1
+# Generate and also append .env-style output to wallets.env
+npm run wallet:all-networks -- --save
 
-# Sweep a BEP20 token for user 1
-npx hardhat run scripts/wallet.ts --network bscTestnet -- sweepToken 1 0xTokenAddress
+# Check the deployer balance for one network
+npm run wallet:check -- --network=bscTestnet
+npm run wallet:check -- --network=arbitrumSepoliaTestnet
+
+# Check deployer balances for all networks (uses DEPLOYER_PRIVATE_KEY_<NETWORK> from .env)
+npm run wallet:check -- --all-networks
+```
+
+Each network gets its own env keys, for example for BSC Testnet:
+
+```bash
+DEPLOYER_PRIVATE_KEY_BSC_TESTNET=0x...
+RELAYER_ADDRESS_BSC_TESTNET=0x...
+MOTHER_WALLET_BSC_TESTNET=0x...
 ```
 
 ---

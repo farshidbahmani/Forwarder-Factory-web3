@@ -14,25 +14,25 @@
 
     "deploy:bscTestnet":      "hardhat run scripts/deploy.ts --network bscTestnet",
     "deploy:bscMainnet":      "hardhat run scripts/deploy.ts --network bscMainnet",
-    "deploy:opBNB":           "hardhat run scripts/deploy.ts --network opBNB",
+    "deploy:opBNBMainnet":    "hardhat run scripts/deploy.ts --network opBNBMainnet",
 
-    "deploy:sepolia":         "hardhat run scripts/deploy.ts --network sepolia",
-    "deploy:ethereum":        "hardhat run scripts/deploy.ts --network ethereum",
+    "deploy:sepoliaTestnet":  "hardhat run scripts/deploy.ts --network sepoliaTestnet",
+    "deploy:ethereumMainnet": "hardhat run scripts/deploy.ts --network ethereumMainnet",
 
-    "deploy:polygonAmoy":     "hardhat run scripts/deploy.ts --network polygonAmoy",
-    "deploy:polygon":         "hardhat run scripts/deploy.ts --network polygon",
+    "deploy:polygonAmoyTestnet": "hardhat run scripts/deploy.ts --network polygonAmoyTestnet",
+    "deploy:polygonMainnet":  "hardhat run scripts/deploy.ts --network polygonMainnet",
 
-    "deploy:arbitrumSepolia": "hardhat run scripts/deploy.ts --network arbitrumSepolia",
-    "deploy:arbitrum":        "hardhat run scripts/deploy.ts --network arbitrum",
+    "deploy:arbitrumSepoliaTestnet": "hardhat run scripts/deploy.ts --network arbitrumSepoliaTestnet",
+    "deploy:arbitrumMainnet": "hardhat run scripts/deploy.ts --network arbitrumMainnet",
 
-    "deploy:optimismSepolia": "hardhat run scripts/deploy.ts --network optimismSepolia",
-    "deploy:optimism":        "hardhat run scripts/deploy.ts --network optimism",
+    "deploy:optimismSepoliaTestnet": "hardhat run scripts/deploy.ts --network optimismSepoliaTestnet",
+    "deploy:optimismMainnet": "hardhat run scripts/deploy.ts --network optimismMainnet",
 
-    "deploy:baseSepolia":     "hardhat run scripts/deploy.ts --network baseSepolia",
-    "deploy:base":            "hardhat run scripts/deploy.ts --network base",
+    "deploy:baseSepoliaTestnet": "hardhat run scripts/deploy.ts --network baseSepoliaTestnet",
+    "deploy:baseMainnet":     "hardhat run scripts/deploy.ts --network baseMainnet",
 
-    "deploy:avalancheFuji":   "hardhat run scripts/deploy.ts --network avalancheFuji",
-    "deploy:avalanche":       "hardhat run scripts/deploy.ts --network avalanche"
+    "deploy:avalancheFujiTestnet": "hardhat run scripts/deploy.ts --network avalancheFujiTestnet",
+    "deploy:avalancheMainnet": "hardhat run scripts/deploy.ts --network avalancheMainnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

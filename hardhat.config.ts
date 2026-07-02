@@ -29,80 +29,80 @@ const config: HardhatUserConfig = {
       chainId: 97,
       accounts,
     },
-    opBNB: {
-      url: process.env.OPBNB_RPC || "https://opbnb-mainnet-rpc.bnbchain.org",
+    opBNBMainnet: {
+      url: process.env.OPBNB_MAINNET_RPC || "https://opbnb-mainnet-rpc.bnbchain.org",
       chainId: 204,
       accounts,
     },
 
     // ── Ethereum ────────────────────────────────────────────
-    ethereum: {
-      url: process.env.ETHEREUM_RPC || "https://eth.llamarpc.com",
+    ethereumMainnet: {
+      url: process.env.ETHEREUM_MAINNET_RPC || "https://eth.llamarpc.com",
       chainId: 1,
       accounts,
     },
-    sepolia: {
-      url: process.env.SEPOLIA_RPC || "https://rpc.sepolia.org",
+    sepoliaTestnet: {
+      url: process.env.SEPOLIA_TESTNET_RPC || "https://rpc.sepolia.org",
       chainId: 11155111,
       accounts,
     },
 
     // ── Polygon ─────────────────────────────────────────────
-    polygon: {
-      url: process.env.POLYGON_RPC || "https://polygon-rpc.com",
+    polygonMainnet: {
+      url: process.env.POLYGON_MAINNET_RPC || "https://polygon-rpc.com",
       chainId: 137,
       accounts,
     },
-    polygonAmoy: {
-      url: process.env.POLYGON_AMOY_RPC || "https://rpc-amoy.polygon.technology",
+    polygonAmoyTestnet: {
+      url: process.env.POLYGON_AMOY_TESTNET_RPC || "https://rpc-amoy.polygon.technology",
       chainId: 80002,
       accounts,
     },
 
     // ── Arbitrum ────────────────────────────────────────────
-    arbitrum: {
-      url: process.env.ARBITRUM_RPC || "https://arb1.arbitrum.io/rpc",
+    arbitrumMainnet: {
+      url: process.env.ARBITRUM_MAINNET_RPC || "https://arb1.arbitrum.io/rpc",
       chainId: 42161,
       accounts,
     },
-    arbitrumSepolia: {
-      url: process.env.ARBITRUM_SEPOLIA_RPC || "https://sepolia-rollup.arbitrum.io/rpc",
+    arbitrumSepoliaTestnet: {
+      url: process.env.ARBITRUM_SEPOLIA_TESTNET_RPC || "https://sepolia-rollup.arbitrum.io/rpc",
       chainId: 421614,
       accounts,
     },
 
     // ── Optimism ────────────────────────────────────────────
-    optimism: {
-      url: process.env.OPTIMISM_RPC || "https://mainnet.optimism.io",
+    optimismMainnet: {
+      url: process.env.OPTIMISM_MAINNET_RPC || "https://mainnet.optimism.io",
       chainId: 10,
       accounts,
     },
-    optimismSepolia: {
-      url: process.env.OPTIMISM_SEPOLIA_RPC || "https://sepolia.optimism.io",
+    optimismSepoliaTestnet: {
+      url: process.env.OPTIMISM_SEPOLIA_TESTNET_RPC || "https://sepolia.optimism.io",
       chainId: 11155420,
       accounts,
     },
 
     // ── Base ────────────────────────────────────────────────
-    base: {
-      url: process.env.BASE_RPC || "https://mainnet.base.org",
+    baseMainnet: {
+      url: process.env.BASE_MAINNET_RPC || "https://mainnet.base.org",
       chainId: 8453,
       accounts,
     },
-    baseSepolia: {
-      url: process.env.BASE_SEPOLIA_RPC || "https://sepolia.base.org",
+    baseSepoliaTestnet: {
+      url: process.env.BASE_SEPOLIA_TESTNET_RPC || "https://sepolia.base.org",
       chainId: 84532,
       accounts,
     },
 
     // ── Avalanche ───────────────────────────────────────────
-    avalanche: {
-      url: process.env.AVALANCHE_RPC || "https://api.avax.network/ext/bc/C/rpc",
+    avalancheMainnet: {
+      url: process.env.AVALANCHE_MAINNET_RPC || "https://api.avax.network/ext/bc/C/rpc",
       chainId: 43114,
       accounts,
     },
-    avalancheFuji: {
-      url: process.env.AVALANCHE_FUJI_RPC || "https://api.avax-test.network/ext/bc/C/rpc",
+    avalancheFujiTestnet: {
+      url: process.env.AVALANCHE_FUJI_TESTNET_RPC || "https://api.avax-test.network/ext/bc/C/rpc",
       chainId: 43113,
       accounts,
     },
