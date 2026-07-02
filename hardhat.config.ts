@@ -41,7 +41,7 @@ const config: HardhatUserConfig = {
       chainId: 1,
       accounts,
     },
-    sepoliaTestnet: {
+    ethereumSepoliaTestnet: {
       url: process.env.SEPOLIA_TESTNET_RPC || "https://rpc.sepolia.org",
       chainId: 11155111,
       accounts,

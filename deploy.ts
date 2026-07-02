@@ -6,7 +6,7 @@ const NATIVE_SYMBOL: Record<string, string> = {
   bscTestnet:      "tBNB",
   opBNBMainnet:           "BNB",
   ethereumMainnet:        "ETH",
-  sepoliaTestnet:         "ETH",
+  ethereumSepoliaTestnet: "ETH",
   polygonMainnet:         "MATIC",
   polygonAmoyTestnet:     "MATIC",
   arbitrumMainnet:        "ETH",

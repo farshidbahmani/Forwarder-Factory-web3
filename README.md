@@ -55,7 +55,7 @@ The user **never pays gas**. The relayer pays gas for the sweep transaction.
 | `bscTestnet` | __Testnet__ | 97 |
 | `opBNBMainnet` | __Mainnet__ | 204 |
 | `ethereumMainnet` | __Mainnet__ | 1 |
-| `sepoliaTestnet` | __Testnet__ | 11155111 |
+| `ethereumSepoliaTestnet` | __Testnet__ | 11155111 |
 | `polygonMainnet` | __Mainnet__ | 137 |
 | `polygonAmoyTestnet` | __Testnet__ | 80002 |
 | `arbitrumMainnet` | __Mainnet__ | 42161 |
@@ -122,7 +122,7 @@ Always deploy to testnet first and verify everything works before mainnet.
 **Testnet:**
 ```bash
 npm run deploy:bscTestnet
-npm run deploy:sepoliaTestnet
+npm run deploy:ethereumSepoliaTestnet
 npm run deploy:polygonAmoyTestnet
 npm run deploy:arbitrumSepoliaTestnet
 npm run deploy:optimismSepoliaTestnet

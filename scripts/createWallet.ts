@@ -8,7 +8,7 @@ const NETWORKS = [
   { name: "bscTestnet",      chainId: 97,      symbol: "tBNB",  url: process.env.BSC_TESTNET_RPC        || "https://data-seed-prebsc-1-s1.bnbchain.org:8545" },
   { name: "opBNBMainnet",           chainId: 204,      symbol: "BNB",   url: process.env.OPBNB_MAINNET_RPC                 || "https://opbnb-mainnet-rpc.bnbchain.org" },
   { name: "ethereumMainnet",        chainId: 1,        symbol: "ETH",   url: process.env.ETHEREUM_MAINNET_RPC              || "https://eth.llamarpc.com" },
-  { name: "sepoliaTestnet",         chainId: 11155111, symbol: "ETH",   url: process.env.SEPOLIA_TESTNET_RPC               || "https://rpc.sepolia.org" },
+  { name: "ethereumSepoliaTestnet", chainId: 11155111, symbol: "ETH",   url: process.env.SEPOLIA_TESTNET_RPC               || "https://rpc.sepolia.org" },
   { name: "polygonMainnet",         chainId: 137,      symbol: "MATIC", url: process.env.POLYGON_MAINNET_RPC               || "https://polygon-rpc.com" },
   { name: "polygonAmoyTestnet",     chainId: 80002,    symbol: "MATIC", url: process.env.POLYGON_AMOY_TESTNET_RPC          || "https://rpc-amoy.polygon.technology" },
   { name: "arbitrumMainnet",        chainId: 42161,    symbol: "ETH",   url: process.env.ARBITRUM_MAINNET_RPC              || "https://arb1.arbitrum.io/rpc" },

@@ -16,7 +16,7 @@
     "deploy:bscMainnet":      "hardhat run scripts/deploy.ts --network bscMainnet",
     "deploy:opBNBMainnet":    "hardhat run scripts/deploy.ts --network opBNBMainnet",
 
-    "deploy:sepoliaTestnet":  "hardhat run scripts/deploy.ts --network sepoliaTestnet",
+    "deploy:ethereumSepoliaTestnet":  "hardhat run scripts/deploy.ts --network ethereumSepoliaTestnet",
     "deploy:ethereumMainnet": "hardhat run scripts/deploy.ts --network ethereumMainnet",
 
     "deploy:polygonAmoyTestnet": "hardhat run scripts/deploy.ts --network polygonAmoyTestnet",
