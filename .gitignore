@@ -2,3 +2,13 @@ node_modules
 .env
 wallets.env
 dist
+bin/server
+
+# Foundry
+cache/
+out/
+broadcast/
+
+# legacy hardhat
+artifacts/
+typechain-types/

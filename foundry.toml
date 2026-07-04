@@ -1,0 +1,45 @@
+[profile.default]
+src = "contracts"
+test = "test"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+
+remappings = [
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+]
+
+[rpc_endpoints]
+bscMainnet = "${BSC_MAINNET_RPC}"
+bscTestnet = "${BSC_TESTNET_RPC}"
+opBNBMainnet = "${OPBNB_MAINNET_RPC}"
+ethereumMainnet = "${ETHEREUM_MAINNET_RPC}"
+ethereumSepoliaTestnet = "${SEPOLIA_TESTNET_RPC}"
+polygonMainnet = "${POLYGON_MAINNET_RPC}"
+polygonAmoyTestnet = "${POLYGON_AMOY_TESTNET_RPC}"
+arbitrumMainnet = "${ARBITRUM_MAINNET_RPC}"
+arbitrumSepoliaTestnet = "${ARBITRUM_SEPOLIA_TESTNET_RPC}"
+optimismMainnet = "${OPTIMISM_MAINNET_RPC}"
+optimismSepoliaTestnet = "${OPTIMISM_SEPOLIA_TESTNET_RPC}"
+baseMainnet = "${BASE_MAINNET_RPC}"
+baseSepoliaTestnet = "${BASE_SEPOLIA_TESTNET_RPC}"
+avalancheMainnet = "${AVALANCHE_MAINNET_RPC}"
+avalancheFujiTestnet = "${AVALANCHE_FUJI_TESTNET_RPC}"
+
+[etherscan]
+bsc = { key = "${BSCSCAN_API_KEY}" }
+bscTestnet = { key = "${BSCSCAN_API_KEY}" }
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+polygon = { key = "${POLYGONSCAN_API_KEY}" }
+polygonAmoy = { key = "${POLYGONSCAN_API_KEY}" }
+arbitrum = { key = "${ARBISCAN_API_KEY}" }
+arbitrumSepolia = { key = "${ARBISCAN_API_KEY}" }
+optimism = { key = "${OPTIMISM_API_KEY}" }
+optimismSepolia = { key = "${OPTIMISM_API_KEY}" }
+base = { key = "${BASESCAN_API_KEY}" }
+baseSepolia = { key = "${BASESCAN_API_KEY}" }
+avalanche = { key = "${SNOWTRACE_API_KEY}" }
+avalancheFuji = { key = "${SNOWTRACE_API_KEY}" }
