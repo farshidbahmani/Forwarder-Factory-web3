@@ -41,13 +41,13 @@ describe("ForwarderFactory", () => {
   });
 
   // ────────────────────────────────────────────
-  describe("deployAndSweepBNB", () => {
-    it("should sweep BNB to the mother wallet", async () => {
+  describe("deployAndSweepNative", () => {
+    it("should sweep native token to the mother wallet", async () => {
       const userWallet = await factory.getAddress(USER_ID);
       await user.sendTransaction({ to: userWallet, value: ethers.parseEther("1") });
 
       const before = await ethers.provider.getBalance(motherWallet.address);
-      await factory.connect(relayer).deployAndSweepBNB(USER_ID);
+      await factory.connect(relayer).deployAndSweepNative(USER_ID);
       const after  = await ethers.provider.getBalance(motherWallet.address);
 
       expect(after - before).to.equal(ethers.parseEther("1"));
@@ -57,17 +57,17 @@ describe("ForwarderFactory", () => {
       const userWallet = await factory.getAddress(USER_ID);
 
       await user.sendTransaction({ to: userWallet, value: ethers.parseEther("1") });
-      await factory.connect(relayer).deployAndSweepBNB(USER_ID);
+      await factory.connect(relayer).deployAndSweepNative(USER_ID);
 
       await user.sendTransaction({ to: userWallet, value: ethers.parseEther("0.5") });
       await expect(
-        factory.connect(relayer).deployAndSweepBNB(USER_ID)
+        factory.connect(relayer).deployAndSweepNative(USER_ID)
       ).to.not.emit(factory, "WalletDeployed");
     });
 
     it("non-relayer should not be able to sweep", async () => {
       await expect(
-        factory.connect(attacker).deployAndSweepBNB(USER_ID)
+        factory.connect(attacker).deployAndSweepNative(USER_ID)
       ).to.be.revertedWith("Factory: not relayer");
     });
   });
@@ -88,13 +88,13 @@ describe("ForwarderFactory", () => {
 
   // ────────────────────────────────────────────
   describe("emergencyWithdraw", () => {
-    it("Owner should be able to emergency withdraw BNB", async () => {
+    it("Owner should be able to emergency withdraw native token", async () => {
       const userWallet = await factory.getAddress(USER_ID);
       await user.sendTransaction({ to: userWallet, value: ethers.parseEther("1") });
       await factory.connect(relayer).deployWallet(USER_ID);
 
       const before = await ethers.provider.getBalance(owner.address);
-      await factory.connect(owner).emergencyWithdrawBNB(USER_ID, owner.address);
+      await factory.connect(owner).emergencyWithdrawNative(USER_ID, owner.address);
       const after  = await ethers.provider.getBalance(owner.address);
 
       expect(after).to.be.gt(before); // some gas is spent, but funds arrive
@@ -106,7 +106,7 @@ describe("ForwarderFactory", () => {
       await factory.connect(relayer).deployWallet(USER_ID);
 
       await expect(
-        factory.connect(attacker).emergencyWithdrawBNB(USER_ID, attacker.address)
+        factory.connect(attacker).emergencyWithdrawNative(USER_ID, attacker.address)
       ).to.be.revertedWith("Factory: not owner");
     });
   });

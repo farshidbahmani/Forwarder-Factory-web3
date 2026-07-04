@@ -12,7 +12,7 @@ User deposits BNB or BEP20 token to their address
   └── funds sit on the predicted address
 
 Backend detects the deposit
-  └── relayer calls deployAndSweepBNB(userId) or deployAndSweepToken(userId, token)
+  └── relayer calls deployAndSweepNative(userId) or deployAndSweepToken(userId, token)
       └── Forwarder wallet is deployed (first time only)
       └── Funds are swept to the mother wallet in the same transaction
 ```
@@ -72,21 +72,28 @@ The user **never pays gas**. The relayer pays gas for the sweep transaction.
 ## Project Structure
 
 ```
-bnb-forwarder/
-├── contracts/
-│   ├── Forwarder.sol          # User wallet implementation
-│   ├── ForwarderFactory.sol   # Factory + admin logic
-│   └── MockBEP20.sol          # Test token (local only)
-├── scripts/
-│   ├── deploy.ts              # Deploy Factory to any network
-│   └── createWallet.ts        # CLI tools for per-network wallet generation
+forwarder-factory/
+├── contracts/                 # Solidity smart contracts
+├── src/
+│   ├── domain/                # Entities, network config, contract metadata
+│   ├── application/           # Use cases (wallet, deploy, contract)
+│   ├── infrastructure/        # Env repo, ethers/hardhat gateways
+│   └── presentation/
+│       └── api/               # Express REST API
+├── scripts/                   # Legacy CLI scripts (optional)
 ├── test/
-│   └── factory.test.ts        # Hardhat tests
 ├── hardhat.config.ts
-├── tsconfig.json
-├── package.json
-└── .env.example
+└── package.json
 ```
+
+### Clean Architecture Layers
+
+| Layer | Responsibility |
+|---|---|
+| **Domain** | Network definitions, wallet types, contract function catalog |
+| **Application** | Business logic — wallet generation, deploy orchestration, contract calls |
+| **Infrastructure** | `.env` persistence, ethers providers, Hardhat compile/verify |
+| **Presentation** | Express REST API |
 
 ---
 
@@ -100,7 +107,7 @@ npm install
 **2. Create your `.env` file**
 ```bash
 cp .env.example .env
-# Fill in your values
+# Fill in your values (or generate via API)
 ```
 
 **3. Compile contracts**
@@ -115,11 +122,76 @@ npm test
 
 ---
 
-## Deploy
+## API Server
+
+```bash
+npm run dev
+# or
+npm start
+```
+
+Base URL: http://localhost:3000
+
+**API docs (Swagger UI):** http://localhost:3000  
+OpenAPI JSON: http://localhost:3000/api/openapi.json
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/health` | Health check |
+| GET | `/api/networks` | List all networks |
+| GET | `/api/networks/:name/status` | Env config status for a network |
+| GET | `/api/wallets/generate?network=` | Generate wallets for one network |
+| GET | `/api/wallets/balance?network=&address=` | Native balance for an address |
+| GET | `/api/wallets/status?network=` | Env config status for one network |
+| POST | `/api/deploy/compile` | Compile contracts |
+| POST | `/api/deploy` | Deploy factory (`{ network, verify? }`) |
+| GET | `/api/contracts/functions` | List callable contract functions |
+| GET | `/api/contracts/:network/info` | Deployed factory info |
+| POST | `/api/contracts/call` | Call contract (`{ network, functionName, args }`) |
+
+### Examples
+
+```bash
+# Generate wallets for BSC Testnet
+curl "http://localhost:3000/api/wallets/generate?network=bscTestnet"
+
+# Check balance for an address
+curl "http://localhost:3000/api/wallets/balance?network=bscTestnet&address=0xDD281B850B8a32F2dca05f5058b6656d32C2998f"
+
+# Deploy factory
+curl -X POST http://localhost:3000/api/deploy \
+  -H "Content-Type: application/json" \
+  -d '{"network":"bscTestnet","verify":true}'
+
+# Read getAddress
+curl -X POST http://localhost:3000/api/contracts/call \
+  -H "Content-Type: application/json" \
+  -d '{"network":"bscTestnet","functionName":"getAddress","args":{"userId":"12345"}}'
+```
+
+### Per-network `.env` keys
+
+Each network uses its own suffix, e.g. for BSC Testnet:
+
+```bash
+DEPLOYER_PRIVATE_KEY_BSC_TESTNET=0x...
+RELAYER_PRIVATE_KEY_BSC_TESTNET=0x...
+RELAYER_ADDRESS_BSC_TESTNET=0x...
+MOTHER_WALLET_BSC_TESTNET=0x...
+FACTORY_ADDRESS_BSC_TESTNET=0x...
+```
+
+---
+
+## Deploy (API or CLI)
 
 Always deploy to testnet first and verify everything works before mainnet.
 
-**Testnet:**
+**API:** `POST /api/deploy` with `{ "network": "bscTestnet" }`
+
+**CLI (legacy):**
 ```bash
 npm run deploy:bscTestnet
 npm run deploy:ethereumSepoliaTestnet
@@ -150,9 +222,11 @@ FACTORY_ADDRESS_POLYGON=0x...
 
 ---
 
-## Wallet CLI (per network)
+## Wallet Management (API or CLI)
 
-Use the wallet generator to create dedicated deployer/relayer/mother wallets for each network.
+**API:** `GET /api/wallets/generate?network=bscTestnet`
+
+**CLI (legacy):**
 
 ```bash
 # List supported networks
@@ -160,19 +234,12 @@ npm run wallet:list
 
 # Generate wallets for a single network
 npm run wallet:create -- --network=bscTestnet
-npm run wallet:create -- --network=ethereumMainnet
 
 # Generate wallets for all networks at once
 npm run wallet:all-networks
 
-# Generate and also append .env-style output to wallets.env
-npm run wallet:all-networks -- --save
-
-# Check the deployer balance for one network
+# Check deployer balance
 npm run wallet:check -- --network=bscTestnet
-npm run wallet:check -- --network=arbitrumSepoliaTestnet
-
-# Check deployer balances for all networks (uses DEPLOYER_PRIVATE_KEY_<NETWORK> from .env)
 npm run wallet:check -- --all-networks
 ```
 
@@ -180,13 +247,26 @@ Each network gets its own env keys, for example for BSC Testnet:
 
 ```bash
 DEPLOYER_PRIVATE_KEY_BSC_TESTNET=0x...
+RELAYER_PRIVATE_KEY_BSC_TESTNET=0x...
 RELAYER_ADDRESS_BSC_TESTNET=0x...
 MOTHER_WALLET_BSC_TESTNET=0x...
 ```
 
 ---
 
-## Admin Operations
+## Contract Calls (API)
+
+Use `POST /api/contracts/call` for read/write functions.
+
+- **Read:** `getAddress`, `motherWallet`, `relayer`, timelock state, etc.
+- **Write (relayer):** `deployWallet`, `deployAndSweepNative`, `deployAndSweepToken`
+- **Write (owner):** `updateRelayer`, `transferOwnership`, emergency withdrawals, mother wallet timelock
+
+List all functions: `GET /api/contracts/functions`
+
+---
+
+## Admin Operations (on-chain reference)
 
 ### Rotate the relayer key
 ```solidity
@@ -208,8 +288,8 @@ cancelMotherWalletChange()
 
 ### Emergency withdrawal (if sweep is broken)
 ```solidity
-// Rescue BNB from a user's wallet directly
-emergencyWithdrawBNB(userId, destinationAddress)
+// Rescue native token from a user's wallet directly
+emergencyWithdrawNative(userId, destinationAddress)
 
 // Rescue a BEP20 token from a user's wallet directly
 emergencyWithdrawToken(userId, tokenAddress, destinationAddress)

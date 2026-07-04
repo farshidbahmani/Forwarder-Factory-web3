@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface IFactory {
     function motherWallet() external view returns (address);
+    // FIX #1: added owner() to interface — avoids raw staticcall in onlyOwner modifier
+    function owner() external view returns (address);
 }
 
 /// @title Forwarder
@@ -15,29 +17,32 @@ interface IFactory {
 ///   - onlyFactory: only the Factory can trigger sweeps
 ///   - nonReentrant: prevents reentrancy attacks
 ///   - emergencyWithdraw: if the Factory fails, the Owner can rescue funds directly
+///     Funds are always sent to motherWallet — no free `to` parameter
+/// Known limitation:
+///   - ERC-777 tokens trigger tokensReceived() hook on transfer;
+///     nonReentrant guards against reentrancy, but avoid whitelisting ERC-777 tokens
+///     in production without additional review.
 contract Forwarder is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address public immutable factory;
 
     event SweptToken(address indexed token, address indexed to, uint256 amount);
-    event SweptBNB(address indexed to, uint256 amount);
+    event SweptNative(address indexed to, uint256 amount);
     event EmergencyWithdrawToken(address indexed token, address indexed to, uint256 amount);
-    event EmergencyWithdrawBNB(address indexed to, uint256 amount);
+    event EmergencyWithdrawNative(address indexed to, uint256 amount);
+    // FIX #2: added Received event so every incoming ETH is traceable on-chain
+    event Received(address indexed sender, uint256 amount);
 
     modifier onlyFactory() {
         require(msg.sender == factory, "Forwarder: not factory");
         _;
     }
 
-    /// @dev Only the Factory owner can perform emergency withdrawals
+    /// @dev Resolves the Factory owner via the typed IFactory interface.
+    // FIX #1: replaced raw staticcall with IFactory.owner() — cleaner and safer
     modifier onlyOwner() {
-        (bool ok, bytes memory data) = factory.staticcall(
-            abi.encodeWithSignature("owner()")
-        );
-        require(ok, "Forwarder: owner call failed");
-        address factoryOwner = abi.decode(data, (address));
-        require(msg.sender == factoryOwner, "Forwarder: not owner");
+        require(msg.sender == IFactory(factory).owner(), "Forwarder: not owner");
         _;
     }
 
@@ -51,6 +56,8 @@ contract Forwarder is ReentrancyGuard {
     // ─────────────────────────────────────────
 
     function sweepToken(address token) external onlyFactory nonReentrant {
+        // FIX #3: zero-address check on token
+        require(token != address(0), "Forwarder: zero token");
         address mother = IFactory(factory).motherWallet();
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "Forwarder: zero token balance");
@@ -58,42 +65,48 @@ contract Forwarder is ReentrancyGuard {
         emit SweptToken(token, mother, balance);
     }
 
-    function sweepBNB() external onlyFactory nonReentrant {
+    function sweepNative() external onlyFactory nonReentrant {
         address mother = IFactory(factory).motherWallet();
         uint256 balance = address(this).balance;
-        require(balance > 0, "Forwarder: zero BNB balance");
+        require(balance > 0, "Forwarder: zero native balance");
         (bool success, ) = mother.call{value: balance}("");
-        require(success, "Forwarder: BNB transfer failed");
-        emit SweptBNB(mother, balance);
+        require(success, "Forwarder: native transfer failed");
+        emit SweptNative(mother, balance);
     }
 
     // ─────────────────────────────────────────
     // Emergency functions (directly by Owner)
     // If the Factory has a bug or is unavailable,
-    // the Owner can rescue funds directly
+    // the Owner can rescue funds directly.
+    // FIX #4: funds always go to motherWallet — free `to` parameter removed
+    //         to prevent drained funds in case of a compromised owner key
     // ─────────────────────────────────────────
 
-    /// @notice Emergency BEP20 token withdrawal — Factory owner only
-    function emergencyWithdrawToken(
-        address token,
-        address to
-    ) external onlyOwner nonReentrant {
-        require(to != address(0), "Forwarder: zero to");
+    /// @notice Emergency BEP20 token withdrawal — Factory owner only.
+    /// Funds are always sent to motherWallet (read from Factory at call time).
+    function emergencyWithdrawToken(address token) external onlyOwner nonReentrant {
+        // FIX #3: zero-address check on token
+        require(token != address(0), "Forwarder: zero token");
+        address mother = IFactory(factory).motherWallet();
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "Forwarder: zero token balance");
-        IERC20(token).safeTransfer(to, balance);
-        emit EmergencyWithdrawToken(token, to, balance);
+        IERC20(token).safeTransfer(mother, balance);
+        emit EmergencyWithdrawToken(token, mother, balance);
     }
 
-    /// @notice Emergency BNB withdrawal — Factory owner only
-    function emergencyWithdrawBNB(address to) external onlyOwner nonReentrant {
-        require(to != address(0), "Forwarder: zero to");
+    /// @notice Emergency native token withdrawal — Factory owner only.
+    /// Funds are always sent to motherWallet (read from Factory at call time).
+    function emergencyWithdrawNative() external onlyOwner nonReentrant {
+        address mother = IFactory(factory).motherWallet();
         uint256 balance = address(this).balance;
-        require(balance > 0, "Forwarder: zero BNB balance");
-        (bool success, ) = to.call{value: balance}("");
-        require(success, "Forwarder: BNB transfer failed");
-        emit EmergencyWithdrawBNB(to, balance);
+        require(balance > 0, "Forwarder: zero native balance");
+        (bool success, ) = mother.call{value: balance}("");
+        require(success, "Forwarder: native transfer failed");
+        emit EmergencyWithdrawNative(mother, balance);
     }
 
-    receive() external payable {}
+    // FIX #2: emit Received event on every incoming ETH for on-chain traceability
+    receive() external payable {
+        emit Received(msg.sender, msg.value);
+    }
 }
