@@ -43,20 +43,82 @@ contract ForwarderFactoryTest is Test {
         assertTrue(addr1 != addr2);
     }
 
-    function test_deployAndSweepNative_sweepsToMother() public {
+    function test_sweepNative_sweepsToMother() public {
         address userWallet = factory.getAddress(USER_ID);
         vm.deal(user, 1 ether);
         vm.prank(user);
         (bool ok,) = userWallet.call{value: 1 ether}("");
         assertTrue(ok);
 
+        vm.prank(relayer);
+        factory.deployWallet(USER_ID);
+
         uint256 before = motherWallet.balance;
         vm.prank(relayer);
-        factory.deployAndSweepNative(USER_ID);
+        factory.sweepNative(userWallet);
         assertEq(motherWallet.balance - before, 1 ether);
     }
 
-    function test_deployAndSweepNative_secondSweepWithoutRedeploy() public {
+    function test_sweepNative_secondSweepWithoutRedeploy() public {
+        address userWallet = factory.getAddress(USER_ID);
+        vm.deal(user, 1.5 ether);
+
+        vm.prank(user);
+        (bool ok,) = userWallet.call{value: 1 ether}("");
+        assertTrue(ok);
+        vm.prank(relayer);
+        factory.deployWallet(USER_ID);
+        vm.prank(relayer);
+        factory.sweepNative(userWallet);
+
+        vm.prank(user);
+        (ok,) = userWallet.call{value: 0.5 ether}("");
+        assertTrue(ok);
+
+        vm.prank(relayer);
+        factory.sweepNative(userWallet);
+        assertEq(motherWallet.balance, 1.5 ether);
+    }
+
+    function test_sweepNative_revertsForNonRelayer() public {
+        address userWallet = factory.getAddress(USER_ID);
+        vm.prank(relayer);
+        factory.deployWallet(USER_ID);
+        vm.prank(attacker);
+        vm.expectRevert("Factory: not relayer");
+        factory.sweepNative(userWallet);
+    }
+
+    function test_sweepNative_revertsForUndeployedWallet() public {
+        address userWallet = factory.getAddress(USER_ID);
+        vm.prank(relayer);
+        vm.expectRevert("Factory: wallet not deployed");
+        factory.sweepNative(userWallet);
+    }
+
+    function test_sweepNative_revertsForForeignWallet() public {
+        Forwarder foreign = new Forwarder(makeAddr("foreignFactory"));
+        vm.prank(relayer);
+        vm.expectRevert("Factory: not our wallet");
+        factory.sweepNative(address(foreign));
+    }
+
+    function test_deployAndSweepNative_deploysAndSweeps() public {
+        address userWallet = factory.getAddress(USER_ID);
+        vm.deal(user, 1 ether);
+        vm.prank(user);
+        (bool ok,) = userWallet.call{value: 1 ether}("");
+        assertTrue(ok);
+        assertEq(userWallet.code.length, 0);
+
+        vm.prank(relayer);
+        factory.deployAndSweepNative(USER_ID);
+
+        assertTrue(userWallet.code.length > 0);
+        assertEq(motherWallet.balance, 1 ether);
+    }
+
+    function test_deployAndSweepNative_secondCallSkipsDeploy() public {
         address userWallet = factory.getAddress(USER_ID);
         vm.deal(user, 1.5 ether);
 
@@ -71,14 +133,8 @@ contract ForwarderFactoryTest is Test {
         assertTrue(ok);
 
         vm.prank(relayer);
-        vm.recordLogs();
         factory.deployAndSweepNative(USER_ID);
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        for (uint256 i = 0; i < entries.length; i++) {
-            assertFalse(
-                entries[i].topics[0] == keccak256("WalletDeployed(uint256,address)")
-            );
-        }
+        assertEq(motherWallet.balance, 1.5 ether);
     }
 
     function test_deployAndSweepNative_revertsForNonRelayer() public {
@@ -87,13 +143,28 @@ contract ForwarderFactoryTest is Test {
         factory.deployAndSweepNative(USER_ID);
     }
 
-    function test_deployAndSweepToken_sweepsToMother() public {
+    function test_deployAndSweepToken_deploysAndSweeps() public {
+        address userWallet = factory.getAddress(USER_ID);
+        token.mint(userWallet, 100 ether);
+        assertEq(userWallet.code.length, 0);
+
+        vm.prank(relayer);
+        factory.deployAndSweepToken(USER_ID, address(token));
+
+        assertTrue(userWallet.code.length > 0);
+        assertEq(token.balanceOf(motherWallet), 100 ether);
+    }
+
+    function test_sweepToken_sweepsToMother() public {
         address userWallet = factory.getAddress(USER_ID);
         token.mint(userWallet, 100 ether);
 
+        vm.prank(relayer);
+        factory.deployWallet(USER_ID);
+
         uint256 before = token.balanceOf(motherWallet);
         vm.prank(relayer);
-        factory.deployAndSweepToken(USER_ID, address(token));
+        factory.sweepToken(userWallet, address(token));
         assertEq(token.balanceOf(motherWallet) - before, 100 ether);
     }
 

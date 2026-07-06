@@ -13,6 +13,7 @@ import (
 	"forwarder-factory/internal/blockchain"
 	"forwarder-factory/internal/env"
 	"forwarder-factory/internal/network"
+	"forwarder-factory/internal/tron"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -22,10 +23,15 @@ import (
 type Service struct {
 	env   *env.Store
 	chain *blockchain.Client
+	tron  *tron.DeployService
 }
 
-func New(envStore *env.Store, chain *blockchain.Client) *Service {
-	return &Service{env: envStore, chain: chain}
+func New(envStore *env.Store, chain *blockchain.Client, tronClient *tron.Client) *Service {
+	return &Service{
+		env:   envStore,
+		chain: chain,
+		tron:  tron.NewDeployService(envStore, tronClient),
+	}
 }
 
 type Result struct {
@@ -54,17 +60,43 @@ func (s *Service) Compile() error {
 	return nil
 }
 
-func (s *Service) Deploy(ctx context.Context, networkName string, verify bool) (*Result, error) {
+func (s *Service) Deploy(ctx context.Context, networkName string, verify bool, completeSetup bool) (*Result, error) {
 	net, err := network.Get(networkName)
 	if err != nil {
 		return nil, apperror.BadRequest(err.Error())
+	}
+	if network.IsTron(net) {
+		if err := s.Compile(); err != nil {
+			return nil, err
+		}
+		var res *tron.DeployResult
+		if completeSetup {
+			res, err = s.tron.CompleteSetup(ctx, networkName, verify)
+		} else {
+			res, err = s.tron.Deploy(ctx, networkName, verify)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &Result{
+			Network:               res.Network,
+			FactoryAddress:        res.FactoryAddress,
+			ImplementationAddress: res.ImplementationAddress,
+			DeployerAddress:       res.DeployerAddress,
+			DeployerBalance:       res.DeployerBalance,
+			Symbol:                res.Symbol,
+			Verified:              res.Verified,
+			VerificationMessage:   res.VerificationMessage,
+			EnvKey:                res.EnvKey,
+		}, nil
 	}
 
 	mother := s.env.GetForNetwork("MOTHER_WALLET", net.EnvSuffix)
 	relayer := s.env.GetForNetwork("RELAYER_ADDRESS", net.EnvSuffix)
 	if mother == "" || relayer == "" {
 		return nil, apperror.BadRequest(fmt.Sprintf(
-			"Set MOTHER_WALLET_%s and RELAYER_ADDRESS_%s in .env", net.EnvSuffix, net.EnvSuffix,
+			"Set %s and %s in .env",
+			network.EnvKey("MOTHER_WALLET", net), network.EnvKey("RELAYER_ADDRESS", net),
 		))
 	}
 
@@ -116,9 +148,6 @@ func (s *Service) Deploy(ctx context.Context, networkName string, verify bool) (
 
 	factoryAddr := addr.Hex()
 	envKey := network.EnvKey("FACTORY_ADDRESS", net)
-	if err := s.env.SetMany(map[string]string{envKey: factoryAddr}); err != nil {
-		return nil, err
-	}
 
 	verified := false
 	var verificationMessage *string
@@ -205,7 +234,7 @@ func (s *Service) verify(net network.Config, factoryAddr, mother, relayer string
 
 func explorerAPIKey(envSuffix string, getenv func(string) string) string {
 	switch {
-	case strings.HasPrefix(envSuffix, "BSC"), strings.HasPrefix(envSuffix, "OPBNB"):
+	case strings.HasPrefix(envSuffix, "BNB"), strings.HasPrefix(envSuffix, "BSC"), strings.HasPrefix(envSuffix, "OPBNB"):
 		return getenv("BSCSCAN_API_KEY")
 	case strings.HasPrefix(envSuffix, "ETHEREUM"):
 		return getenv("ETHERSCAN_API_KEY")

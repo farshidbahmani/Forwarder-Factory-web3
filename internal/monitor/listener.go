@@ -23,17 +23,19 @@ const (
 
 type DepositEvent struct {
 	Network     string
-	UserID      string
+	Address     string
 	Type        DepositType
 	TxHash      string
 	BlockNumber uint64
 	Token       string
+	Amount      *big.Int
 }
 
 type Listener struct {
 	networkName     string
 	client          *ethclient.Client
 	addressToUserID map[common.Address]string
+	addrMu          sync.RWMutex
 	onDeposit       func(DepositEvent)
 	processed       map[string]struct{}
 	mu              sync.Mutex
@@ -54,6 +56,19 @@ func NewListener(networkName string, client *ethclient.Client, addressToUserID m
 
 func (l *Listener) IsRunning() bool  { return l.running }
 func (l *Listener) LastBlock() uint64 { return l.lastBlock }
+
+func (l *Listener) UpdateAddresses(addressToUserID map[common.Address]string) {
+	l.addrMu.Lock()
+	l.addressToUserID = addressToUserID
+	l.addrMu.Unlock()
+}
+
+func (l *Listener) lookupUserID(addr common.Address) (string, bool) {
+	l.addrMu.RLock()
+	defer l.addrMu.RUnlock()
+	id, ok := l.addressToUserID[addr]
+	return id, ok
+}
 
 func (l *Listener) Start(ctx context.Context) error {
 	if l.running {
@@ -125,15 +140,15 @@ func (l *Listener) processBlock(ctx context.Context, blockNumber uint64) error {
 			continue
 		}
 		to := *tx.To()
-		userID, ok := l.addressToUserID[to]
+		userID, ok := l.lookupUserID(to)
 		if !ok {
 			continue
 		}
 		key := tx.Hash().Hex() + ":native"
 		if l.markProcessed(key) {
 			l.onDeposit(DepositEvent{
-				Network: l.networkName, UserID: userID, Type: DepositNative,
-				TxHash: tx.Hash().Hex(), BlockNumber: blockNumber,
+				Network: l.networkName, Address: userID, Type: DepositNative,
+				TxHash: tx.Hash().Hex(), BlockNumber: blockNumber, Amount: tx.Value(),
 			})
 		}
 	}
@@ -152,15 +167,17 @@ func (l *Listener) processBlock(ctx context.Context, blockNumber uint64) error {
 			continue
 		}
 		to := common.BytesToAddress(lg.Topics[2].Bytes()[12:])
-		userID, ok := l.addressToUserID[to]
+		userID, ok := l.lookupUserID(to)
 		if !ok {
 			continue
 		}
 		key := lg.TxHash.Hex() + ":" + lg.Address.Hex() + ":token"
 		if l.markProcessed(key) {
+			amount := new(big.Int).SetBytes(lg.Data)
 			l.onDeposit(DepositEvent{
-				Network: l.networkName, UserID: userID, Type: DepositToken,
+				Network: l.networkName, Address: userID, Type: DepositToken,
 				TxHash: lg.TxHash.Hex(), BlockNumber: blockNumber, Token: lg.Address.Hex(),
+				Amount: amount,
 			})
 		}
 	}

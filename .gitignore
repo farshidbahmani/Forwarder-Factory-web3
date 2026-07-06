@@ -3,6 +3,7 @@ node_modules
 wallets.env
 dist
 bin/server
+tmp/
 
 # Foundry
 cache/

@@ -31,6 +31,8 @@ contract Forwarder is ReentrancyGuard {
     event SweptNative(address indexed to, uint256 amount);
     event EmergencyWithdrawToken(address indexed token, address indexed to, uint256 amount);
     event EmergencyWithdrawNative(address indexed to, uint256 amount);
+    // FIX #2: added Received event so every incoming ETH is traceable on-chain
+    event Received(address indexed sender, uint256 amount);
 
     modifier onlyFactory() {
         require(msg.sender == factory, "Forwarder: not factory");
@@ -103,11 +105,8 @@ contract Forwarder is ReentrancyGuard {
         emit EmergencyWithdrawNative(mother, balance);
     }
 
-    // GAS: intentionally empty — no Received event, saving ~1,400 gas on every
-    // user deposit. Direct (EOA) deposits are already visible on-chain as regular
-    // transactions; internal transfers can be traced via the node's trace API.
-    // NOTE: clones cannot receive ETH via .transfer()/.send() (2300 gas stipend)
-    // regardless of this body, because the EIP-1167 cold DELEGATECALL alone
-    // costs 2600 gas.
-    receive() external payable {}
+    // FIX #2: emit Received event on every incoming ETH for on-chain traceability
+    receive() external payable {
+        emit Received(msg.sender, msg.value);
+    }
 }

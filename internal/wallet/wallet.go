@@ -12,19 +12,22 @@ import (
 	"forwarder-factory/internal/blockchain"
 	"forwarder-factory/internal/env"
 	"forwarder-factory/internal/network"
+	"forwarder-factory/internal/tron"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	tronaddr "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/tyler-smith/go-bip39"
 )
 
 type Service struct {
 	env   *env.Store
 	chain *blockchain.Client
+	tron  *tron.Client
 }
 
-func New(envStore *env.Store, chain *blockchain.Client) *Service {
-	return &Service{env: envStore, chain: chain}
+func New(envStore *env.Store, chain *blockchain.Client, tronClient *tron.Client) *Service {
+	return &Service{env: envStore, chain: chain, tron: tronClient}
 }
 
 type GeneratedWallet struct {
@@ -55,8 +58,9 @@ type Balance struct {
 
 type Status struct {
 	Network        string  `json:"network"`
-	DeployerKey    bool    `json:"deployerKey"`
-	RelayerKey     bool    `json:"relayerKey"`
+	DeployerKey      bool    `json:"deployerKey"`
+	DeployerAddress  *string `json:"deployerAddress"`
+	RelayerKey       bool    `json:"relayerKey"`
 	RelayerAddress *string `json:"relayerAddress"`
 	MotherWallet   *string `json:"motherWallet"`
 	FactoryAddress *string `json:"factoryAddress"`
@@ -65,18 +69,19 @@ type Status struct {
 func (s *Service) ListNetworks() []network.Config { return network.All }
 
 func (s *Service) GenerateForNetwork(networkName string) (*NetworkWallets, error) {
-	if _, err := network.Get(networkName); err != nil {
+	net, err := network.Get(networkName)
+	if err != nil {
 		return nil, apperror.BadRequest(err.Error())
 	}
-	d, err := randomWallet()
+	d, err := randomWallet(network.IsTron(net))
 	if err != nil {
 		return nil, err
 	}
-	r, err := randomWallet()
+	r, err := randomWallet(network.IsTron(net))
 	if err != nil {
 		return nil, err
 	}
-	m, err := randomWallet()
+	m, err := randomWallet(network.IsTron(net))
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +96,10 @@ func (s *Service) ToEnvSnippet(wallets *NetworkWallets) (*EnvSnippet, error) {
 	lines := []string{
 		"# " + wallets.Network,
 		network.EnvKey("DEPLOYER_PRIVATE_KEY", net) + "=" + wallets.Deployer.PrivateKey,
+		network.EnvKey("DEPLOYER_ADDRESS", net) + "=" + wallets.Deployer.Address,
 		network.EnvKey("RELAYER_PRIVATE_KEY", net) + "=" + wallets.Relayer.PrivateKey,
 		network.EnvKey("RELAYER_ADDRESS", net) + "=" + wallets.Relayer.Address,
+		network.EnvKey("MOTHER_PRIVATE_KEY", net) + "=" + wallets.Mother.PrivateKey,
 		network.EnvKey("MOTHER_WALLET", net) + "=" + wallets.Mother.Address,
 	}
 	return &EnvSnippet{Network: wallets.Network, Lines: lines}, nil
@@ -111,6 +118,32 @@ func (s *Service) CheckBalance(ctx context.Context, networkName, address string)
 	if err != nil {
 		return nil, apperror.BadRequest(err.Error())
 	}
+
+	if network.IsTron(net) {
+		if !tron.IsValidAddress(address) {
+			return nil, apperror.BadRequest("Invalid address")
+		}
+		normalized, err := tron.NormalizeAddress(address)
+		if err != nil {
+			return nil, err
+		}
+		grpc, _, err := s.tron.GRPC(networkName)
+		if err != nil {
+			return nil, err
+		}
+		acc, err := grpc.GetAccountCtx(ctx, normalized)
+		if err != nil {
+			return nil, err
+		}
+		return &Balance{
+			Network: networkName,
+			ChainID: net.ChainID,
+			Symbol:  net.Symbol,
+			Address: normalized,
+			Balance: sunToTRX(big.NewInt(acc.Balance)),
+		}, nil
+	}
+
 	if !common.IsHexAddress(address) {
 		return nil, apperror.BadRequest("Invalid address")
 	}
@@ -139,35 +172,41 @@ func (s *Service) GetEnvStatus(networkName string) (*Status, error) {
 		return nil, apperror.BadRequest(err.Error())
 	}
 	return &Status{
-		Network:        networkName,
-		DeployerKey:    s.env.GetForNetwork("DEPLOYER_PRIVATE_KEY", net.EnvSuffix) != "",
-		RelayerKey:     s.env.GetForNetwork("RELAYER_PRIVATE_KEY", net.EnvSuffix) != "",
+		Network:         networkName,
+		DeployerKey:     s.env.GetForNetwork("DEPLOYER_PRIVATE_KEY", net.EnvSuffix) != "",
+		DeployerAddress: strPtr(s.env.GetForNetwork("DEPLOYER_ADDRESS", net.EnvSuffix)),
+		RelayerKey:      s.env.GetForNetwork("RELAYER_PRIVATE_KEY", net.EnvSuffix) != "",
 		RelayerAddress: strPtr(s.env.GetForNetwork("RELAYER_ADDRESS", net.EnvSuffix)),
 		MotherWallet:   strPtr(s.env.GetForNetwork("MOTHER_WALLET", net.EnvSuffix)),
-		FactoryAddress: strPtr(s.env.Get(network.EnvKey("FACTORY_ADDRESS", net))),
+		FactoryAddress: strPtr(s.env.GetForNetwork("FACTORY_ADDRESS", net.EnvSuffix)),
 	}, nil
 }
 
-func randomWallet() (GeneratedWallet, error) {
+func randomWallet(useTron bool) (GeneratedWallet, error) {
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		return GeneratedWallet{}, err
 	}
 	entropy, err := bip39.NewEntropy(128)
 	if err != nil {
-		return fromKey(key, nil), nil
+		return fromKey(key, nil, useTron), nil
 	}
 	mnemonic, err := bip39.NewMnemonic(entropy)
 	if err != nil {
-		return fromKey(key, nil), nil
+		return fromKey(key, nil, useTron), nil
 	}
-	return fromKey(key, &mnemonic), nil
+	return fromKey(key, &mnemonic, useTron), nil
 }
 
-func fromKey(key *ecdsa.PrivateKey, mnemonic *string) GeneratedWallet {
-	addr := crypto.PubkeyToAddress(key.PublicKey)
+func fromKey(key *ecdsa.PrivateKey, mnemonic *string, useTron bool) GeneratedWallet {
 	pk := "0x" + hex.EncodeToString(crypto.FromECDSA(key))
-	return GeneratedWallet{Address: addr.Hex(), PrivateKey: pk, Mnemonic: mnemonic}
+	var addr string
+	if useTron {
+		addr = tronaddr.PubkeyToAddress(key.PublicKey).String()
+	} else {
+		addr = crypto.PubkeyToAddress(key.PublicKey).Hex()
+	}
+	return GeneratedWallet{Address: addr, PrivateKey: pk, Mnemonic: mnemonic}
 }
 
 func strPtr(s string) *string {
@@ -181,4 +220,10 @@ func weiToEther(wei *big.Int) string {
 	f := new(big.Float).Quo(new(big.Float).SetInt(wei), big.NewFloat(1e18))
 	v, _ := f.Float64()
 	return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.18f", v), "0"), ".")
+}
+
+func sunToTRX(sun *big.Int) string {
+	f := new(big.Float).Quo(new(big.Float).SetInt(sun), big.NewFloat(1e6))
+	v, _ := f.Float64()
+	return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.6f", v), "0"), ".")
 }

@@ -46,30 +46,20 @@ func (s *Store) Get(key string) string {
 }
 
 func (s *Store) GetForNetwork(baseKey, envSuffix string) string {
+	if v := s.Get(envSuffix + "_" + baseKey); v != "" {
+		return v
+	}
+	// legacy env prefix (BSC_TESTNET → BNB_TESTNET)
+	if envSuffix == "BNB_TESTNET" {
+		if v := s.Get("BSC_TESTNET_" + baseKey); v != "" {
+			return v
+		}
+	}
+	// legacy: BASE_KEY_NETWORK_SUFFIX
 	if v := s.Get(baseKey + "_" + envSuffix); v != "" {
 		return v
 	}
 	return s.Get(baseKey)
-}
-
-func (s *Store) SetMany(entries map[string]string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	merged := s.readFileLocked()
-	for k, v := range entries {
-		merged[k] = v
-		os.Setenv(k, v)
-	}
-
-	lines := make([]string, 0, len(merged))
-	for k, v := range merged {
-		lines = append(lines, k+"="+v)
-	}
-	if err := os.WriteFile(s.path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *Store) readFile() map[string]string {

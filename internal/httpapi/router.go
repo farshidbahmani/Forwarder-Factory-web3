@@ -107,8 +107,9 @@ func NewRouter(app *App) http.Handler {
 	})
 	r.Post("/api/deploy", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			Network string `json:"network"`
-			Verify  *bool  `json:"verify"`
+			Network       string `json:"network"`
+			Verify        *bool  `json:"verify"`
+			CompleteSetup *bool  `json:"completeSetup"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Network == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "network is required"})
@@ -118,7 +119,11 @@ func NewRouter(app *App) http.Handler {
 		if body.Verify != nil {
 			verify = *body.Verify
 		}
-		res, err := app.Deploy.Deploy(r.Context(), body.Network, verify)
+		completeSetup := false
+		if body.CompleteSetup != nil {
+			completeSetup = *body.CompleteSetup
+		}
+		res, err := app.Deploy.Deploy(r.Context(), body.Network, verify, completeSetup)
 		writeResult(w, err, res)
 	})
 
@@ -153,6 +158,33 @@ func NewRouter(app *App) http.Handler {
 
 	r.Get("/api/monitor/wallets", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, app.Monitor.ListMonitoredWallets())
+	})
+	r.Put("/api/monitor/wallets", func(w http.ResponseWriter, r *http.Request) {
+		var body monitor.WalletPushRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
+			return
+		}
+		res, err := app.Monitor.ReplaceWallets(r.Context(), body)
+		writeResult(w, err, res)
+	})
+	r.Post("/api/monitor/wallets", func(w http.ResponseWriter, r *http.Request) {
+		var body monitor.WalletPushRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
+			return
+		}
+		res, err := app.Monitor.PushWallets(r.Context(), body)
+		writeResult(w, err, res)
+	})
+	r.Delete("/api/monitor/wallets", func(w http.ResponseWriter, r *http.Request) {
+		var body monitor.WalletRemoveRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
+			return
+		}
+		res, err := app.Monitor.RemoveWallets(r.Context(), body)
+		writeResult(w, err, res)
 	})
 	r.Get("/api/monitor/status", func(w http.ResponseWriter, r *http.Request) {
 		networkName := r.URL.Query().Get("network")
@@ -263,7 +295,7 @@ func parseNetworkParam(value string) (string, error) {
 		for _, n := range network.All {
 			names = append(names, n.Name)
 		}
-		return "", apperror.BadRequest("Invalid network \"" + value + "\". Use a real network key, e.g. bscTestnet. Supported: " + strings.Join(names, ", "))
+		return "", apperror.BadRequest("Invalid network \"" + value + "\". Use a real network key, e.g. bnbTestnet. Supported: " + strings.Join(names, ", "))
 	}
 	return value, nil
 }

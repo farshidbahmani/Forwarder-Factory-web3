@@ -1,1 +1,833 @@
-{"openapi":"3.0.3","info":{"title":"Forwarder Factory API","version":"1.0.0","description":"REST API for multi-chain wallet generation, ForwarderFactory deployment, on-chain contract calls, and deposit monitoring."},"tags":[{"name":"Health","description":"Service health"},{"name":"Networks","description":"Supported blockchain networks"},{"name":"Wallets","description":"Wallet generation and balance lookup"},{"name":"Deploy","description":"Contract compile and deploy"},{"name":"Contracts","description":"ForwarderFactory read/write calls"},{"name":"Monitor","description":"Block monitoring and auto-sweep"}],"paths":{"/api/health":{"get":{"tags":["Health"],"operationId":"getHealth","summary":"Health check","responses":{"200":{"description":"Service is running","content":{"application/json":{"schema":{"type":"object","properties":{"status":{"type":"string","example":"ok"}}}}}}}}},"/api/networks":{"get":{"tags":["Networks"],"operationId":"listNetworks","summary":"List all supported networks","responses":{"200":{"description":"Network list","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Network"}}}}}}}},"/api/networks/{name}/status":{"get":{"tags":["Networks"],"operationId":"getNetworkStatus","summary":"Env config status for a network","parameters":[{"$ref":"#/components/parameters/networkName"}],"responses":{"200":{"description":"Config status","content":{"application/json":{"schema":{"$ref":"#/components/schemas/NetworkStatus"}}}}}}},"/api/wallets/generate":{"get":{"tags":["Wallets"],"operationId":"generateWallets","summary":"Generate wallets for one network","description":"Creates deployer, relayer, and mother wallets. Use ?format=env for plain-text .env copy.","parameters":[{"$ref":"#/components/parameters/networkQuery"},{"name":"format","in":"query","required":false,"schema":{"type":"string","enum":["json","env"],"default":"json"},"description":"Set to env to get ready-to-paste plain text"}],"responses":{"200":{"description":"Generated wallets (JSON) or .env text (format=env)","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GenerateWalletsResponse"}},"text/plain":{"schema":{"type":"string"}}}},"400":{"$ref":"#/components/responses/BadRequest"}}}},"/api/wallets/balance":{"get":{"tags":["Wallets"],"operationId":"getWalletBalance","summary":"Get native token balance for an address","parameters":[{"$ref":"#/components/parameters/networkQuery"},{"name":"address","in":"query","required":true,"schema":{"type":"string","example":"0xDD281B850B8a32F2dca05f5058b6656d32C2998f"}}],"responses":{"200":{"description":"Balance","content":{"application/json":{"schema":{"$ref":"#/components/schemas/WalletBalance"}}}},"400":{"$ref":"#/components/responses/BadRequest"}}}},"/api/wallets/status":{"get":{"tags":["Wallets"],"operationId":"getWalletStatus","summary":"Env config status for one network","parameters":[{"$ref":"#/components/parameters/networkQuery"}],"responses":{"200":{"description":"Config status","content":{"application/json":{"schema":{"$ref":"#/components/schemas/NetworkStatus"}}}},"400":{"$ref":"#/components/responses/BadRequest"}}}},"/api/deploy/compile":{"post":{"tags":["Deploy"],"operationId":"compileContracts","summary":"Compile contracts","responses":{"200":{"description":"Compiled","content":{"application/json":{"schema":{"type":"object","properties":{"compiled":{"type":"boolean","example":true}}}}}}}}},"/api/deploy":{"post":{"tags":["Deploy"],"operationId":"deployFactory","summary":"Deploy ForwarderFactory","requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/DeployRequest"}}}},"responses":{"200":{"description":"Deploy result","content":{"application/json":{"schema":{"$ref":"#/components/schemas/DeployResult"}}}},"400":{"$ref":"#/components/responses/BadRequest"}}}},"/api/contracts/functions":{"get":{"tags":["Contracts"],"operationId":"listContractFunctions","summary":"List callable ForwarderFactory functions","responses":{"200":{"description":"Function definitions","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/ContractFunction"}}}}}}}},"/api/contracts/{network}/info":{"get":{"tags":["Contracts"],"operationId":"getFactoryInfo","summary":"Get deployed factory info","parameters":[{"$ref":"#/components/parameters/networkPath"}],"responses":{"200":{"description":"Factory info","content":{"application/json":{"schema":{"$ref":"#/components/schemas/FactoryInfo"}}}},"400":{"$ref":"#/components/responses/BadRequest"}}}},"/api/contracts/call":{"post":{"tags":["Contracts"],"operationId":"callContractFunction","summary":"Call a ForwarderFactory function","requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ContractCallRequest"}}}},"responses":{"200":{"description":"Call result","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ContractCallResult"}}}},"400":{"$ref":"#/components/responses/BadRequest"}}}},"/api/monitor/wallets":{"get":{"tags":["Monitor"],"operationId":"listMonitoredWallets","summary":"List monitored user wallets","responses":{"200":{"description":"Monitored wallets","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/MonitoredWallet"}}}}}}}},"/api/monitor/status":{"get":{"tags":["Monitor"],"operationId":"getMonitorStatus","summary":"Monitor status for all or one network","parameters":[{"name":"network","in":"query","required":false,"schema":{"type":"string","example":"bscTestnet"}}],"responses":{"200":{"description":"Monitor status","content":{"application/json":{"schema":{"oneOf":[{"type":"array","items":{"$ref":"#/components/schemas/NetworkMonitorStatus"}},{"$ref":"#/components/schemas/NetworkMonitorStatus"}]}}}}}}},"/api/monitor/addresses":{"get":{"tags":["Monitor"],"operationId":"getMonitoredAddresses","summary":"Resolve monitored wallet addresses on a network","parameters":[{"$ref":"#/components/parameters/networkQuery"}],"responses":{"200":{"description":"Resolved addresses","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MonitoredAddressesResponse"}}}},"400":{"$ref":"#/components/responses/BadRequest"}}}},"/api/monitor/start":{"post":{"tags":["Monitor"],"operationId":"startMonitor","summary":"Start block monitoring on one network","requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","required":["network"],"properties":{"network":{"type":"string","example":"bscTestnet"}}}}}},"responses":{"200":{"description":"Monitor started","content":{"application/json":{"schema":{"type":"object"}}}},"400":{"$ref":"#/components/responses/BadRequest"}}}},"/api/monitor/stop":{"post":{"tags":["Monitor"],"operationId":"stopMonitor","summary":"Stop block monitoring on one network","requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","required":["network"],"properties":{"network":{"type":"string","example":"bscTestnet"}}}}}},"responses":{"200":{"description":"Monitor stopped","content":{"application/json":{"schema":{"type":"object"}}}}}}}},"components":{"parameters":{"networkName":{"name":"name","in":"path","required":true,"schema":{"type":"string","example":"bscTestnet"}},"networkPath":{"name":"network","in":"path","required":true,"schema":{"type":"string","example":"bscTestnet"}},"networkQuery":{"name":"network","in":"query","required":true,"schema":{"type":"string","example":"bscTestnet"}}},"responses":{"BadRequest":{"description":"Bad request","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}},"schemas":{"Error":{"type":"object","properties":{"error":{"type":"string"}}},"Network":{"type":"object","properties":{"name":{"type":"string","example":"bscTestnet"},"chainId":{"type":"integer","example":97},"symbol":{"type":"string","example":"tBNB"},"envSuffix":{"type":"string","example":"BSC_TESTNET"},"isTestnet":{"type":"boolean","example":true}}},"NetworkStatus":{"type":"object","properties":{"network":{"type":"string"},"deployerKey":{"type":"boolean"},"relayerKey":{"type":"boolean"},"relayerAddress":{"type":"string","nullable":true},"motherWallet":{"type":"string","nullable":true},"factoryAddress":{"type":"string","nullable":true}}},"GeneratedWallet":{"type":"object","properties":{"address":{"type":"string"},"privateKey":{"type":"string"},"mnemonic":{"type":"string"}}},"GenerateWalletsResponse":{"type":"object","properties":{"wallets":{"$ref":"#/components/schemas/NetworkWallets"},"snippet":{"type":"object","properties":{"network":{"type":"string"},"lines":{"type":"array","items":{"type":"string"},"description":"One .env line per item — use ?format=env for ready-to-paste plain text"}}}}},"NetworkWallets":{"type":"object","properties":{"network":{"type":"string"},"deployer":{"$ref":"#/components/schemas/GeneratedWallet"},"relayer":{"$ref":"#/components/schemas/GeneratedWallet"},"mother":{"$ref":"#/components/schemas/GeneratedWallet"}}},"WalletBalance":{"type":"object","properties":{"network":{"type":"string"},"chainId":{"type":"integer"},"symbol":{"type":"string"},"address":{"type":"string"},"balance":{"type":"string","example":"1.5"}}},"DeployRequest":{"type":"object","required":["network"],"properties":{"network":{"type":"string","example":"bscTestnet"},"verify":{"type":"boolean","default":true}}},"DeployResult":{"type":"object","properties":{"network":{"type":"string"},"factoryAddress":{"type":"string"},"implementationAddress":{"type":"string"},"deployerAddress":{"type":"string"},"deployerBalance":{"type":"string"},"symbol":{"type":"string"},"verified":{"type":"boolean"},"verificationMessage":{"type":"string"},"envKey":{"type":"string"}}},"ContractFunction":{"type":"object","properties":{"name":{"type":"string"},"label":{"type":"string"},"description":{"type":"string"},"type":{"type":"string","enum":["read","write"]},"role":{"type":"string","enum":["any","owner","relayer"]},"inputs":{"type":"array","items":{"type":"object"}}}},"FactoryInfo":{"type":"object","properties":{"factoryAddress":{"type":"string"},"motherWallet":{"type":"string"},"relayer":{"type":"string"},"owner":{"type":"string"},"implementation":{"type":"string"}}},"ContractCallRequest":{"type":"object","required":["network","functionName"],"properties":{"network":{"type":"string","example":"bscTestnet"},"functionName":{"type":"string","example":"getAddress"},"args":{"type":"object","additionalProperties":{"type":"string"},"example":{"userId":"12345"}}}},"ContractCallResult":{"type":"object","properties":{"functionName":{"type":"string"},"type":{"type":"string","enum":["read","write"]},"result":{},"txHash":{"type":"string"},"blockNumber":{"type":"integer"},"gasUsed":{"type":"string"}}},"MonitoredWallet":{"type":"object","properties":{"userId":{"type":"string","example":"1"},"label":{"type":"string","example":"user-1"}}},"MonitoredAddressesResponse":{"type":"object","properties":{"network":{"type":"string"},"addresses":{"type":"array","items":{"type":"object","properties":{"userId":{"type":"string"},"address":{"type":"string"},"label":{"type":"string"}}}}}},"NetworkMonitorStatus":{"type":"object","properties":{"network":{"type":"string"},"running":{"type":"boolean"},"lastBlock":{"type":"integer"},"watchedAddresses":{"type":"array","items":{"type":"object"}},"recentSweeps":{"type":"array","items":{"type":"object"}}}}}}}
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Forwarder Factory API",
+    "version": "1.0.0",
+    "description": "REST API for multi-chain wallet generation, factory deployment, on-chain contract calls, and deposit monitoring.\n\n**EVM networks** use `ForwarderFactory` (OpenZeppelin EIP-1167 clones, CREATE2 prefix `0xff`).\n\n**Tron networks** (`tronMainnet`, `tronShasta`) use `ForwarderFactoryTron` with TVM-correct CREATE2 address prediction (prefix `0x41`). Tron addresses are base58 (`T...`). After upgrading Tron support, redeploy on each Tron network — deposit addresses from an old EVM-style factory are **not** compatible."
+  },
+  "tags": [
+    { "name": "Health", "description": "Service health" },
+    { "name": "Networks", "description": "Supported blockchain networks (`chainType`: `evm` or `tron`)" },
+    { "name": "Wallets", "description": "Wallet generation and balance lookup" },
+    { "name": "Deploy", "description": "Contract compile and deploy. EVM → `ForwarderFactory`. Tron → `ForwarderFactoryTron`." },
+    { "name": "Contracts", "description": "Factory read/write calls. Same ABI surface; Tron uses base58 addresses (`T...`)." },
+    { "name": "Monitor", "description": "Push wallet registry from external services, block monitoring, and auto-sweep (EVM + Tron TRX/TRC20)" }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": ["Health"],
+        "operationId": "getHealth",
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service is running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/networks": {
+      "get": {
+        "tags": ["Networks"],
+        "operationId": "listNetworks",
+        "summary": "List all supported networks",
+        "responses": {
+          "200": {
+            "description": "Network list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Network" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/networks/{name}/status": {
+      "get": {
+        "tags": ["Networks"],
+        "operationId": "getNetworkStatus",
+        "summary": "Env config status for a network",
+        "parameters": [{ "$ref": "#/components/parameters/networkName" }],
+        "responses": {
+          "200": {
+            "description": "Config status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NetworkStatus" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wallets/generate": {
+      "get": {
+        "tags": ["Wallets"],
+        "operationId": "generateWallets",
+        "summary": "Generate wallets for one network",
+        "description": "Creates deployer, relayer, and mother wallets. Tron networks return base58 `T...` addresses. Use `?format=env` for plain-text `.env` copy.",
+        "parameters": [
+          { "$ref": "#/components/parameters/networkQuery" },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["json", "env"], "default": "json" },
+            "description": "Set to `env` to get ready-to-paste plain text"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Generated wallets (JSON) or .env text (`format=env`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GenerateWalletsResponse" }
+              },
+              "text/plain": { "schema": { "type": "string" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/wallets/balance": {
+      "get": {
+        "tags": ["Wallets"],
+        "operationId": "getWalletBalance",
+        "summary": "Get native token balance for an address",
+        "description": "EVM: `0x...` address. Tron: base58 `T...` address.",
+        "parameters": [
+          { "$ref": "#/components/parameters/networkQuery" },
+          {
+            "name": "address",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": {
+                "evm": { "value": "0xDD281B850B8a32F2dca05f5058b6656d32C2998f" },
+                "tron": { "value": "TWmZYKU6Tthw4Qr7eXRfSWx1YoCWN5GWVK" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Balance",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WalletBalance" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/wallets/status": {
+      "get": {
+        "tags": ["Wallets"],
+        "operationId": "getWalletStatus",
+        "summary": "Env config status for one network",
+        "parameters": [{ "$ref": "#/components/parameters/networkQuery" }],
+        "responses": {
+          "200": {
+            "description": "Config status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NetworkStatus" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/deploy/compile": {
+      "post": {
+        "tags": ["Deploy"],
+        "operationId": "compileContracts",
+        "summary": "Compile contracts",
+        "description": "Runs `forge build` (builds both `ForwarderFactory` and `ForwarderFactoryTron`).",
+        "responses": {
+          "200": {
+            "description": "Compiled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "compiled": { "type": "boolean", "example": true }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deploy": {
+      "post": {
+        "tags": ["Deploy"],
+        "operationId": "deployFactory",
+        "summary": "Deploy factory contract",
+        "description": "Deploys `ForwarderFactory` on EVM networks or `ForwarderFactoryTron` on Tron. Tron full deploy also deploys `Forwarder` and calls `setImplementation`. Use `completeSetup: true` to finish an existing Tron factory. Returns `factoryAddress`, `implementationAddress`, and `envKey` for manual `.env` update.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeployRequest" },
+              "examples": {
+                "evm": {
+                  "summary": "BNB testnet",
+                  "value": { "network": "bnbTestnet", "verify": true }
+                },
+                "tron": {
+                  "summary": "Tron Shasta testnet",
+                  "value": { "network": "tronShasta", "verify": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deploy result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeployResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/contracts/functions": {
+      "get": {
+        "tags": ["Contracts"],
+        "operationId": "listContractFunctions",
+        "summary": "List callable factory functions",
+        "description": "Same function set for EVM `ForwarderFactory` and Tron `ForwarderFactoryTron`. On Tron, `getAddress` uses TVM CREATE2 (`0x41` prefix).",
+        "responses": {
+          "200": {
+            "description": "Function definitions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ContractFunction" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contracts/{network}/info": {
+      "get": {
+        "tags": ["Contracts"],
+        "operationId": "getFactoryInfo",
+        "summary": "Get deployed factory info",
+        "description": "Returns factory, mother wallet, relayer, owner, and implementation addresses. Tron values are base58 (`T...`).",
+        "parameters": [{ "$ref": "#/components/parameters/networkPath" }],
+        "responses": {
+          "200": {
+            "description": "Factory info",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FactoryInfo" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/contracts/call": {
+      "post": {
+        "tags": ["Contracts"],
+        "operationId": "callContractFunction",
+        "summary": "Call a factory function",
+        "description": "Read functions return JSON `result`. Write functions broadcast a transaction and return `txHash`. Tron token/address args accept `T...` or `0x...`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContractCallRequest" },
+              "examples": {
+                "getAddressTron": {
+                  "summary": "Tron deposit address",
+                  "value": {
+                    "network": "tronShasta",
+                    "functionName": "getAddress",
+                    "args": { "userId": "2" }
+                  }
+                },
+                "sweepNativeTron": {
+                  "summary": "Tron sweep TRX from wallet",
+                  "value": {
+                    "network": "tronShasta",
+                    "functionName": "sweepNative",
+                    "args": { "wallet": "TJe7vmjZBMZ9uTYQg8voyEongViN8kCs3A" }
+                  }
+                },
+                "getAddressEvm": {
+                  "summary": "EVM deposit address",
+                  "value": {
+                    "network": "bnbTestnet",
+                    "functionName": "getAddress",
+                    "args": { "userId": "12345" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Call result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ContractCallResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/monitor/wallets": {
+      "get": {
+        "tags": ["Monitor"],
+        "operationId": "listMonitoredWallets",
+        "summary": "Get pushed wallet registry",
+        "description": "Returns per-network settings and wallet addresses.",
+        "responses": {
+          "200": {
+            "description": "Registry state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WalletRegistryView" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Monitor"],
+        "operationId": "replaceMonitoredWallets",
+        "summary": "Replace wallet registry (push full list)",
+        "description": "Replaces wallets for the given network. Running monitor on that network refreshes immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WalletPushRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registry updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WalletMutationResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      },
+      "post": {
+        "tags": ["Monitor"],
+        "operationId": "pushMonitoredWallets",
+        "summary": "Push wallets (upsert)",
+        "description": "Add or update wallets for the given network. Running monitor on that network refreshes immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WalletPushRequest" },
+              "example": {
+                "network": "bnbTestnet",
+                "setting": {
+                  "nativeMinValueTransfer": 5,
+                  "tokens": [
+                    { "token": "0x55d398326f99059fF775485246999027B3197955", "minValueTransfer": 5 }
+                  ]
+                },
+                "wallets": [
+                  "0xDD281B850B8a32F2dca05f5058b6656d32C2998f"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Wallets pushed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WalletMutationResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      },
+      "delete": {
+        "tags": ["Monitor"],
+        "operationId": "removeMonitoredWallets",
+        "summary": "Remove wallets by address",
+        "description": "Removes wallets from the given network registry. Running monitor on that network refreshes immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WalletRemoveRequest" },
+              "example": {
+                "network": "bnbTestnet",
+                "wallets": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Wallets removed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WalletMutationResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/monitor/status": {
+      "get": {
+        "tags": ["Monitor"],
+        "operationId": "getMonitorStatus",
+        "summary": "Monitor status for all or one network",
+        "parameters": [
+          { "$ref": "#/components/parameters/networkQueryOptional" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitor status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/NetworkMonitorStatus" }
+                    },
+                    { "$ref": "#/components/schemas/NetworkMonitorStatus" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/monitor/addresses": {
+      "get": {
+        "tags": ["Monitor"],
+        "operationId": "getMonitoredAddresses",
+        "summary": "Resolve monitored wallet addresses on a network",
+        "description": "Calls `getAddress` per userId. On Tron, addresses match `ForwarderFactoryTron` prediction.",
+        "parameters": [{ "$ref": "#/components/parameters/networkQuery" }],
+        "responses": {
+          "200": {
+            "description": "Resolved addresses",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitoredAddressesResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/monitor/start": {
+      "post": {
+        "tags": ["Monitor"],
+        "operationId": "startMonitor",
+        "summary": "Start block monitoring on one network",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MonitorNetworkRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Monitor started",
+            "content": {
+              "application/json": { "schema": { "type": "object" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/monitor/stop": {
+      "post": {
+        "tags": ["Monitor"],
+        "operationId": "stopMonitor",
+        "summary": "Stop block monitoring on one network",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MonitorNetworkRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Monitor stopped",
+            "content": {
+              "application/json": { "schema": { "type": "object" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "networkName": {
+        "name": "name",
+        "in": "path",
+        "required": true,
+        "description": "Supported network (select one)",
+        "schema": { "$ref": "#/components/schemas/NetworkName" }
+      },
+      "networkPath": {
+        "name": "network",
+        "in": "path",
+        "required": true,
+        "description": "Supported network (select one)",
+        "schema": { "$ref": "#/components/schemas/NetworkName" }
+      },
+      "networkQuery": {
+        "name": "network",
+        "in": "query",
+        "required": true,
+        "description": "Supported network (select one)",
+        "schema": { "$ref": "#/components/schemas/NetworkName" }
+      },
+      "networkQueryOptional": {
+        "name": "network",
+        "in": "query",
+        "required": false,
+        "description": "Supported network (select one, optional — omit for all)",
+        "schema": { "$ref": "#/components/schemas/NetworkName" }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "NetworkName": {
+        "type": "string",
+        "description": "Supported network (select one)"
+      },
+      "MonitorNetworkRequest": {
+        "type": "object",
+        "required": ["network"],
+        "properties": {
+          "network": { "$ref": "#/components/schemas/NetworkName" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        }
+      },
+      "Network": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "example": "tronShasta" },
+          "chainId": { "type": "integer", "example": 2494104990 },
+          "chainType": { "type": "string", "enum": ["evm", "tron"], "example": "tron" },
+          "symbol": { "type": "string", "example": "TRX" },
+          "envSuffix": { "type": "string", "example": "TRON_SHASTA" },
+          "isTestnet": { "type": "boolean", "example": true }
+        }
+      },
+      "NetworkStatus": {
+        "type": "object",
+        "properties": {
+          "network": { "type": "string" },
+          "deployerKey": { "type": "boolean" },
+          "deployerAddress": { "type": "string", "nullable": true },
+          "relayerKey": { "type": "boolean" },
+          "relayerAddress": { "type": "string", "nullable": true },
+          "motherWallet": { "type": "string", "nullable": true },
+          "factoryAddress": { "type": "string", "nullable": true }
+        }
+      },
+      "GeneratedWallet": {
+        "type": "object",
+        "properties": {
+          "address": { "type": "string" },
+          "privateKey": { "type": "string" },
+          "mnemonic": { "type": "string" }
+        }
+      },
+      "GenerateWalletsResponse": {
+        "type": "object",
+        "properties": {
+          "wallets": { "$ref": "#/components/schemas/NetworkWallets" },
+          "snippet": {
+            "type": "object",
+            "properties": {
+              "network": { "type": "string" },
+              "lines": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "One .env line per item — use `?format=env` for ready-to-paste plain text"
+              }
+            }
+          }
+        }
+      },
+      "NetworkWallets": {
+        "type": "object",
+        "properties": {
+          "network": { "type": "string" },
+          "deployer": { "$ref": "#/components/schemas/GeneratedWallet" },
+          "relayer": { "$ref": "#/components/schemas/GeneratedWallet" },
+          "mother": { "$ref": "#/components/schemas/GeneratedWallet" }
+        }
+      },
+      "WalletBalance": {
+        "type": "object",
+        "properties": {
+          "network": { "type": "string" },
+          "chainId": { "type": "integer" },
+          "symbol": { "type": "string" },
+          "address": { "type": "string" },
+          "balance": { "type": "string", "example": "1.5" }
+        }
+      },
+      "DeployRequest": {
+        "type": "object",
+        "required": ["network"],
+        "properties": {
+          "network": { "$ref": "#/components/schemas/NetworkName" },
+          "verify": {
+            "type": "boolean",
+            "default": true,
+            "description": "EVM: block explorer verify. Tron: returns manual TronScan verification hint."
+          },
+          "completeSetup": {
+            "type": "boolean",
+            "default": false,
+            "description": "Tron only: skip factory deploy; deploy Forwarder + call setImplementation for TRON_*_FACTORY_ADDRESS already in .env. Use when getAddress fails with \"implementation not set\"."
+          }
+        }
+      },
+      "DeployResult": {
+        "type": "object",
+        "properties": {
+          "network": { "type": "string", "example": "tronShasta" },
+          "factoryAddress": { "type": "string", "example": "TT7A1oY55xiiHKccd2MSoGCikLwz5377ht" },
+          "implementationAddress": { "type": "string", "example": "TTgLZwX7rcDzyxYN1etE2YHGGyNwHWHjnc" },
+          "deployerAddress": { "type": "string", "example": "TWmZYKU6Tthw4Qr7eXRfSWx1YoCWN5GWVK" },
+          "deployerBalance": { "type": "string", "example": "1000" },
+          "symbol": { "type": "string", "example": "TRX" },
+          "verified": { "type": "boolean" },
+          "verificationMessage": { "type": "string" },
+          "envKey": { "type": "string", "example": "TRON_SHASTA_FACTORY_ADDRESS", "description": "Suggested .env key — set manually after deploy" }
+        }
+      },
+      "ContractFunction": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "type": "string", "enum": ["read", "write"] },
+          "role": { "type": "string", "enum": ["any", "owner", "relayer"] },
+          "inputs": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "FactoryInfo": {
+        "type": "object",
+        "description": "Deployed factory metadata. Tron addresses are base58 (`T...`).",
+        "properties": {
+          "factoryAddress": { "type": "string", "example": "TT7A1oY55xiiHKccd2MSoGCikLwz5377ht" },
+          "motherWallet": { "type": "string", "example": "TJ8C8FoLDBecsBSUCyb4yfG9NRwCbRXTGg" },
+          "relayer": { "type": "string", "example": "TRk3hJvWLs2oij46fqUwvikQAbUi3fY735" },
+          "owner": { "type": "string" },
+          "implementation": { "type": "string" }
+        }
+      },
+      "ContractCallRequest": {
+        "type": "object",
+        "required": ["network", "functionName"],
+        "properties": {
+          "network": { "$ref": "#/components/schemas/NetworkName" },
+          "functionName": { "type": "string", "example": "getAddress" },
+          "args": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "example": { "userId": "2" }
+          }
+        }
+      },
+      "ContractCallResult": {
+        "type": "object",
+        "properties": {
+          "functionName": { "type": "string" },
+          "type": { "type": "string", "enum": ["read", "write"] },
+          "result": {},
+          "txHash": { "type": "string" },
+          "blockNumber": { "type": "integer" },
+          "gasUsed": { "type": "string", "description": "EVM gas used or Tron energy used" }
+        }
+      },
+      "PushSettings": {
+        "type": "object",
+        "properties": {
+          "nativeMinValueTransfer": { "type": "number", "example": 5, "description": "Minimum native amount (TRX/ETH/BNB human units) before sweep" },
+          "tokens": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TokenSetting" }
+          }
+        }
+      },
+      "TokenSetting": {
+        "type": "object",
+        "required": ["token", "minValueTransfer"],
+        "properties": {
+          "token": { "type": "string", "example": "0x55d398326f99059fF775485246999027B3197955" },
+          "minValueTransfer": { "type": "number", "example": 5 }
+        }
+      },
+      "NetworkWalletRegistry": {
+        "type": "object",
+        "properties": {
+          "setting": { "$ref": "#/components/schemas/PushSettings" },
+          "wallets": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "WalletRegistryView": {
+        "type": "object",
+        "properties": {
+          "networks": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/components/schemas/NetworkWalletRegistry" },
+            "example": {
+              "bnbTestnet": {
+                "setting": { "nativeMinValueTransfer": 5, "tokens": [] },
+                "wallets": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+              },
+              "tronShasta": {
+                "setting": { "nativeMinValueTransfer": 5, "tokens": [] },
+                "wallets": ["TJe7vmjZBMZ9uTYQg8voyEongViN8kCs3A"]
+              }
+            }
+          }
+        }
+      },
+      "WalletPushRequest": {
+        "type": "object",
+        "required": ["network", "setting", "wallets"],
+        "properties": {
+          "network": { "$ref": "#/components/schemas/NetworkName" },
+          "setting": { "$ref": "#/components/schemas/PushSettings" },
+          "wallets": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+          }
+        }
+      },
+      "WalletRemoveRequest": {
+        "type": "object",
+        "required": ["network", "wallets"],
+        "properties": {
+          "network": { "$ref": "#/components/schemas/NetworkName" },
+          "wallets": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+          }
+        }
+      },
+      "WalletMutationResult": {
+        "type": "object",
+        "properties": {
+          "network": { "$ref": "#/components/schemas/NetworkName" },
+          "totalWallets": { "type": "integer", "description": "Wallet count on this network after mutation", "example": 2 },
+          "affected": { "type": "integer", "description": "Added, replaced count, or removed count", "example": 1 },
+          "refreshedNetworks": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/NetworkMonitorStatus" }
+          }
+        }
+      },
+      "MonitoredAddressesResponse": {
+        "type": "object",
+        "properties": {
+          "network": { "type": "string" },
+          "addresses": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+          }
+        }
+      },
+      "NetworkMonitorStatus": {
+        "type": "object",
+        "properties": {
+          "network": { "type": "string" },
+          "running": { "type": "boolean" },
+          "lastBlock": { "type": "integer" },
+          "watchedAddresses": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+          },
+          "recentSweeps": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    }
+  }
+}

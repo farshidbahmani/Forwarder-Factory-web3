@@ -9,6 +9,9 @@ import (
 
 	"forwarder-factory/internal/apperror"
 	"forwarder-factory/internal/blockchain"
+	"forwarder-factory/internal/factoryabi"
+	"forwarder-factory/internal/network"
+	"forwarder-factory/internal/tron"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum"
@@ -19,37 +22,36 @@ import (
 
 type Service struct {
 	chain *blockchain.Client
+	tron  *tron.ContractService
 	abi   abi.ABI
 }
 
-func NewService(chain *blockchain.Client) (*Service, error) {
-	_, parsed, err := blockchain.LoadFactoryArtifact()
+func NewService(chain *blockchain.Client, tronClient *tron.Client) (*Service, error) {
+	_, parsedEVM, err := blockchain.LoadFactoryArtifact()
 	if err != nil {
 		return nil, err
 	}
-	return &Service{chain: chain, abi: parsed}, nil
+	_, parsedTron, err := blockchain.LoadTronFactoryArtifact()
+	if err != nil {
+		return nil, err
+	}
+	return &Service{
+		chain: chain,
+		tron:  tron.NewContractService(tronClient, parsedTron),
+		abi:   parsedEVM,
+	}, nil
 }
 
 func (s *Service) ListFunctions() []FunctionDef { return Functions }
 
-type CallResult struct {
-	FunctionName string      `json:"functionName"`
-	Type         string      `json:"type"`
-	Result       interface{} `json:"result,omitempty"`
-	TxHash       string      `json:"txHash,omitempty"`
-	BlockNumber  uint64      `json:"blockNumber,omitempty"`
-	GasUsed      string      `json:"gasUsed,omitempty"`
-}
-
-type FactoryInfo struct {
-	FactoryAddress   string `json:"factoryAddress"`
-	MotherWallet     string `json:"motherWallet"`
-	Relayer          string `json:"relayer"`
-	Owner            string `json:"owner"`
-	Implementation   string `json:"implementation"`
-}
-
 func (s *Service) GetFactoryInfo(ctx context.Context, networkName string) (*FactoryInfo, error) {
+	net, err := network.Get(networkName)
+	if err != nil {
+		return nil, apperror.BadRequest(err.Error())
+	}
+	if network.IsTron(net) {
+		return s.tron.GetFactoryInfo(ctx, networkName)
+	}
 	addr, net, err := s.chain.FactoryAddress(networkName)
 	if err != nil {
 		return nil, err
@@ -90,7 +92,15 @@ func (s *Service) GetFactoryInfo(ctx context.Context, networkName string) (*Fact
 }
 
 func (s *Service) Call(ctx context.Context, networkName, functionName string, rawArgs map[string]string) (*CallResult, error) {
-	fn, ok := FindFunction(functionName)
+	net, err := network.Get(networkName)
+	if err != nil {
+		return nil, apperror.BadRequest(err.Error())
+	}
+	if network.IsTron(net) {
+		return s.tron.Call(ctx, networkName, functionName, rawArgs)
+	}
+
+	fn, ok := factoryabi.FindFunction(functionName)
 	if !ok {
 		return nil, apperror.BadRequest("Unknown function: " + functionName)
 	}
@@ -181,7 +191,7 @@ func (s *Service) callAddress(ctx context.Context, client *ethclient.Client, add
 	}
 }
 
-func parseArgs(fn FunctionDef, raw map[string]string) ([]interface{}, error) {
+func parseArgs(fn factoryabi.FunctionDef, raw map[string]string) ([]interface{}, error) {
 	if raw == nil {
 		raw = map[string]string{}
 	}

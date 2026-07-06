@@ -54,7 +54,7 @@ func (c *Client) Signer(networkName, role string) (*bind.TransactOpts, *ethclien
 	pkHex := c.env.GetForNetwork(keyName, net.EnvSuffix)
 	if pkHex == "" || pkHex == "0x..." {
 		return nil, client, net, apperror.BadRequest(
-			fmt.Sprintf("Missing %s_%s (or global %s) in .env", keyName, net.EnvSuffix, keyName),
+			fmt.Sprintf("Missing %s (or global %s) in .env", network.EnvKey(keyName, net), keyName),
 		)
 	}
 	pkHex = strings.TrimPrefix(pkHex, "0x")
@@ -78,7 +78,19 @@ type Artifact struct {
 }
 
 func LoadFactoryArtifact() (Artifact, abi.ABI, error) {
-	path := filepath.Join(mustWd(), "out", "ForwarderFactory.sol", "ForwarderFactory.json")
+	return loadArtifact("ForwarderFactory.sol", "ForwarderFactory.json")
+}
+
+func LoadTronFactoryArtifact() (Artifact, abi.ABI, error) {
+	return loadArtifact("ForwarderFactoryTron.sol", "ForwarderFactoryTron.json")
+}
+
+func LoadForwarderArtifact() (Artifact, abi.ABI, error) {
+	return loadArtifact("Forwarder.sol", "Forwarder.json")
+}
+
+func loadArtifact(solFile, jsonFile string) (Artifact, abi.ABI, error) {
+	path := filepath.Join(mustWd(), "out", solFile, jsonFile)
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return Artifact{}, abi.ABI{}, fmt.Errorf("read factory artifact (run `forge build`): %w", err)
@@ -107,7 +119,7 @@ func (c *Client) FactoryAddress(networkName string) (common.Address, network.Con
 		return common.Address{}, net, apperror.BadRequest(err.Error())
 	}
 	key := network.EnvKey("FACTORY_ADDRESS", net)
-	addrStr := c.env.Get(key)
+	addrStr := c.env.GetForNetwork("FACTORY_ADDRESS", net.EnvSuffix)
 	if addrStr == "" {
 		return common.Address{}, net, apperror.BadRequest("No factory deployed. Set " + key + " in .env")
 	}
@@ -124,8 +136,8 @@ func (c *Client) AssertDeployed(ctx context.Context, client *ethclient.Client, n
 	}
 	if len(code) == 0 {
 		return apperror.BadRequest(fmt.Sprintf(
-			"No contract at %s on %s. Check FACTORY_ADDRESS_%s — it may be a wallet address, not the deployed factory.",
-			addr.Hex(), net.Name, net.EnvSuffix,
+			"No contract at %s on %s. Check %s — it may be a wallet address, not the deployed factory.",
+			addr.Hex(), net.Name, network.EnvKey("FACTORY_ADDRESS", net),
 		))
 	}
 	return nil

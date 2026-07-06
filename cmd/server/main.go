@@ -14,23 +14,25 @@ import (
 	"forwarder-factory/internal/env"
 	"forwarder-factory/internal/httpapi"
 	"forwarder-factory/internal/monitor"
+	"forwarder-factory/internal/tron"
 	"forwarder-factory/internal/wallet"
 )
 
 func main() {
 	envStore := env.New("")
 	chain := blockchain.NewClient(envStore)
+	tronClient := tron.NewClient(envStore)
 
-	contractSvc, err := contract.NewService(chain)
+	contractSvc, err := contract.NewService(chain, tronClient)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	app := &httpapi.App{
-		Wallets:   wallet.New(envStore, chain),
-		Deploy:    deploy.New(envStore, chain),
+		Wallets:   wallet.New(envStore, chain, tronClient),
+		Deploy:    deploy.New(envStore, chain, tronClient),
 		Contracts: contractSvc,
-		Monitor:   monitor.New(envStore, contractSvc),
+		Monitor:   monitor.New(envStore, contractSvc, tronClient),
 	}
 
 	port := 3000
@@ -45,8 +47,8 @@ func main() {
 
 	// Start each network separately:
 	go func() {
-		if _, err := app.Monitor.Start(context.Background(), "bscTestnet"); err != nil {
-			log.Printf("[monitor] bscTestnet: %v", err)
+		if _, err := app.Monitor.Start(context.Background(), "bnbTestnet"); err != nil {
+			log.Printf("[monitor] bnbTestnet: %v", err)
 		}
 	}()
 

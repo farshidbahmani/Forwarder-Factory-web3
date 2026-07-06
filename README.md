@@ -13,7 +13,7 @@ cp .env.example .env
 
 forge build     # compile contracts
 forge test      # run contract tests
-go run ./cmd/server
+make dev        # API with hot reload (or: go run ./cmd/server)
 ```
 
 API: http://localhost:3000 — Swagger UI at `/`
@@ -42,28 +42,34 @@ forwarder-factory/
 |------|---------|
 | Compile contracts | `forge build` or `make compile` |
 | Contract tests | `forge test` or `make test` |
-| Run API server | `go run ./cmd/server` or `make run` |
+| Run API server | `make dev` (hot reload) or `go run ./cmd/server` |
 | Build server binary | `make build` |
 
-Deploy & verify via API: `POST /api/deploy` with `{ "network": "bscTestnet", "verify": true }`
+Deploy & verify via API: `POST /api/deploy` with `{ "network": "bnbTestnet", "verify": true }`
 
 ---
 
 ## Supported Networks
 
-`bscTestnet`, `bscMainnet`, `ethereumSepoliaTestnet`, `ethereumMainnet`, `polygonAmoyTestnet`, `polygonMainnet`, `arbitrumSepoliaTestnet`, `arbitrumMainnet`, `optimismSepoliaTestnet`, `optimismMainnet`, `baseSepoliaTestnet`, `baseMainnet`, `avalancheFujiTestnet`, `avalancheMainnet`, `opBNBMainnet`
+`bnbTestnet`, `bnbMainnet`, `ethereumSepoliaTestnet`, `ethereumMainnet`, `polygonAmoyTestnet`, `polygonMainnet`, `arbitrumSepoliaTestnet`, `arbitrumMainnet`, `optimismSepoliaTestnet`, `optimismMainnet`, `baseSepoliaTestnet`, `baseMainnet`, `avalancheFujiTestnet`, `avalancheMainnet`, `opBNBMainnet`, **`tronMainnet`**, **`tronShasta`**
+
+Tron networks use gRPC (not HTTP JSON-RPC) and base58 addresses (`T...`). Deploy **`ForwarderFactoryTron`** (not the EVM `ForwarderFactory`) — it uses TVM-correct CREATE2 address prediction (`0x41` prefix). Monitoring supports native **TRX** and **TRC20** tokens.
+
+> **Important:** After upgrading to `ForwarderFactoryTron`, redeploy on each Tron network (`POST /api/deploy`) and update `TRON_*_FACTORY_ADDRESS`. Deposit addresses from the old factory are **not** compatible; funds sent to old predicted addresses cannot be swept.
 
 ---
 
 ## `.env` keys (per network)
 
 ```bash
-DEPLOYER_PRIVATE_KEY_BSC_TESTNET=0x...
-RELAYER_PRIVATE_KEY_BSC_TESTNET=0x...
-RELAYER_ADDRESS_BSC_TESTNET=0x...
-MOTHER_WALLET_BSC_TESTNET=0x...
-FACTORY_ADDRESS_BSC_TESTNET=0x...
-BSC_TESTNET_RPC=https://...
+BNB_TESTNET_DEPLOYER_PRIVATE_KEY=0x...
+BNB_TESTNET_DEPLOYER_ADDRESS=0x...
+BNB_TESTNET_RELAYER_PRIVATE_KEY=0x...
+BNB_TESTNET_RELAYER_ADDRESS=0x...
+BNB_TESTNET_MOTHER_PRIVATE_KEY=0x...
+BNB_TESTNET_MOTHER_WALLET=0x...
+BNB_TESTNET_FACTORY_ADDRESS=0x...
+BNB_TESTNET_RPC=https://...
 BSCSCAN_API_KEY=...   # for verify on BSC
 ```
 
@@ -88,7 +94,7 @@ BSCSCAN_API_KEY=...   # for verify on BSC
 In `cmd/server/main.go`:
 
 ```go
-app.Monitor.Start(context.Background(), "bscTestnet")
+app.Monitor.Start(context.Background(), "bnbTestnet")
 ```
 
-Or `POST /api/monitor/start` with `{ "network": "bscTestnet" }`.
+Or `POST /api/monitor/start` with `{ "network": "bnbTestnet" }`.

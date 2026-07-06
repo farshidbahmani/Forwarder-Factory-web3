@@ -12,8 +12,8 @@ remappings = [
 ]
 
 [rpc_endpoints]
-bscMainnet = "${BSC_MAINNET_RPC}"
-bscTestnet = "${BSC_TESTNET_RPC}"
+bnbMainnet = "${BNB_MAINNET_RPC}"
+bnbTestnet = "${BNB_TESTNET_RPC}"
 opBNBMainnet = "${OPBNB_MAINNET_RPC}"
 ethereumMainnet = "${ETHEREUM_MAINNET_RPC}"
 ethereumSepoliaTestnet = "${SEPOLIA_TESTNET_RPC}"
@@ -30,7 +30,7 @@ avalancheFujiTestnet = "${AVALANCHE_FUJI_TESTNET_RPC}"
 
 [etherscan]
 bsc = { key = "${BSCSCAN_API_KEY}" }
-bscTestnet = { key = "${BSCSCAN_API_KEY}" }
+bnbTestnet = { key = "${BSCSCAN_API_KEY}" }
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
 polygon = { key = "${POLYGONSCAN_API_KEY}" }

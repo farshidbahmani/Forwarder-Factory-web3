@@ -82,36 +82,11 @@ contract ForwarderFactory {
         emit WalletDeployed(userId, wallet);
     }
 
-    function _requireForwarderWallet(address wallet) internal view {
-        require(wallet != address(0), "Factory: zero wallet");
-        require(wallet.code.length > 0, "Factory: wallet not deployed");
-        require(Forwarder(payable(wallet)).factory() == address(this), "Factory: not our wallet");
-    }
-
-    function sweepToken(address wallet, address token) external onlyRelayer {
-        _requireForwarderWallet(wallet);
-        require(token != address(0), "Factory: zero token");
-        Forwarder(payable(wallet)).sweepToken(token);
-    }
-
-    function sweepNative(address wallet) external onlyRelayer {
-        _requireForwarderWallet(wallet);
-        Forwarder(payable(wallet)).sweepNative();
-    }
-
-    /// @notice Deploys the user's wallet if needed, then sweeps its token balance —
-    /// all in one transaction. `deployWallet` is idempotent, so repeat calls only
-    /// pay a cheap address prediction + code-size check.
-    /// @dev No `_requireForwarderWallet` needed: the address is derived from
-    /// `userId` via CREATE2, so it can only ever be our own clone.
     function deployAndSweepToken(uint256 userId, address token) external onlyRelayer {
-        require(token != address(0), "Factory: zero token");
         address wallet = deployWallet(userId);
         Forwarder(payable(wallet)).sweepToken(token);
     }
 
-    /// @notice Deploys the user's wallet if needed, then sweeps its native balance —
-    /// all in one transaction. See {deployAndSweepToken} for details.
     function deployAndSweepNative(uint256 userId) external onlyRelayer {
         address wallet = deployWallet(userId);
         Forwarder(payable(wallet)).sweepNative();

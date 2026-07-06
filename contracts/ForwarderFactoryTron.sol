@@ -3,26 +3,23 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./Forwarder.sol";
+import "./tron/TronClones.sol";
 
-/// @title ForwarderFactory
-/// @notice Additional protections:
-///   - Timelock: motherWallet changes must be announced 48 hours in advance
-///   - emergencyWithdraw: Owner can rescue funds from any user wallet directly
-///   - Two-step ownership transfer: prevents accidental loss of ownership
-///   - Events emitted for all important state changes
-contract ForwarderFactory {
-    address public immutable implementation;
+/// @title ForwarderFactoryTron
+/// @notice Tron TVM variant of ForwarderFactory.
+/// @dev Uses {TronClones} for address prediction (0x41 CREATE2 prefix) and
+///      OpenZeppelin {Clones} for deployment (TVM create2 opcode handles prefix).
+contract ForwarderFactoryTron {
+    // NOTE: no longer `immutable`. See constructor + setImplementation() comments
+    // below for why, and for why this is still safe.
+    address public implementation;
 
     address public motherWallet;
     address public relayer;
     address public owner;
 
-    // ─── Two-step ownership transfer ───
-    // pendingOwner must call acceptOwnership() to confirm.
-    // Prevents permanent loss of ownership due to a typo.
     address public pendingOwner;
 
-    // ─── Timelock for Mother Wallet changes ───
     uint256 public constant TIMELOCK_DELAY = 48 hours;
     address public pendingMotherWallet;
     uint256 public motherWalletUnlockTime;
@@ -32,15 +29,11 @@ contract ForwarderFactory {
     event MotherWalletChangeRequested(address newMotherWallet, uint256 unlockTime);
     event MotherWalletUpdated(address oldMotherWallet, address newMotherWallet);
     event MotherWalletChangeCancelled(address cancelledAddress);
-
-    // Step 1: current owner nominates a new owner
     event OwnershipTransferStarted(address indexed currentOwner, address indexed pendingOwner);
-    // Step 2: pending owner accepts — ownership is finalized
     event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
-    // Optional: current owner cancels before acceptance
     event OwnershipTransferCancelled(address indexed cancelledPendingOwner);
-
     event EmergencyWithdraw(uint256 indexed userId, address token, address to);
+    event ImplementationSet(address implementation);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Factory: not owner");
@@ -52,29 +45,56 @@ contract ForwarderFactory {
         _;
     }
 
+    // NOTE: the Factory no longer deploys `Forwarder` inline via `new Forwarder(...)`
+    // inside its own constructor. Deploying two contracts (Factory + implementation)
+    // in a single transaction is what made the Tron/BNB deployment Energy cost high.
+    //
+    // Deployment now happens in two steps:
+    //   1. Deploy `ForwarderFactoryTron` with this constructor (cheaper — no nested
+    //      CREATE).
+    //   2. Deploy `Forwarder`, passing this Factory's REAL, now-known address as its
+    //      `factory` argument (the Factory already exists on-chain at this point, so
+    //      there is no address-prediction risk).
+    //   3. Call `setImplementation()` below, once, as the owner.
+    //
+    // This is deliberately NOT done via a constructor parameter, because that would
+    // require predicting the Factory's own future address in advance (from deployer
+    // nonce) to deploy `Forwarder` beforehand — fragile, since any other transaction
+    // from the deployer account in between would silently change that address and
+    // permanently break the system. The two-step setter below avoids that risk
+    // entirely at the cost of one extra, cheap transaction.
     constructor(address _motherWallet, address _relayer) {
         require(_motherWallet != address(0), "Factory: zero mother wallet");
         require(_relayer != address(0), "Factory: zero relayer");
         owner = msg.sender;
         motherWallet = _motherWallet;
         relayer = _relayer;
-        implementation = address(new Forwarder(address(this)));
+    }
+
+    /// @notice Sets the Forwarder implementation used for all clones. Callable
+    /// exactly once, by the owner only. After this call, `implementation` behaves
+    /// exactly like an immutable value would have — it can never be changed again,
+    /// so no new security surface is introduced by dropping `immutable`.
+    function setImplementation(address _implementation) external onlyOwner {
+        require(implementation == address(0), "Factory: implementation already set");
+        require(_implementation != address(0), "Factory: zero implementation");
+        require(_implementation.code.length > 0, "Factory: implementation not deployed");
+        implementation = _implementation;
+        emit ImplementationSet(_implementation);
     }
 
     function _salt(uint256 userId) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(userId));
     }
 
-    // ─────────────────────────────────────────
-    // Core functions
-    // ─────────────────────────────────────────
-
     function getAddress(uint256 userId) external view returns (address) {
-        return Clones.predictDeterministicAddress(implementation, _salt(userId));
+        require(implementation != address(0), "Factory: implementation not set");
+        return TronClones.predictDeterministicAddress(implementation, _salt(userId));
     }
 
     function deployWallet(uint256 userId) public onlyRelayer returns (address wallet) {
-        address predicted = Clones.predictDeterministicAddress(implementation, _salt(userId));
+        require(implementation != address(0), "Factory: implementation not set");
+        address predicted = TronClones.predictDeterministicAddress(implementation, _salt(userId));
         if (predicted.code.length > 0) {
             return predicted;
         }
@@ -117,35 +137,21 @@ contract ForwarderFactory {
         Forwarder(payable(wallet)).sweepNative();
     }
 
-    // ─────────────────────────────────────────
-    // Emergency functions
-    // ─────────────────────────────────────────
-
-    /// @notice Emergency token withdrawal from a specific user wallet — Owner only.
-    /// Funds are always forwarded to motherWallet (enforced inside Forwarder).
     function emergencyWithdrawToken(uint256 userId, address token) external onlyOwner {
-        address wallet = Clones.predictDeterministicAddress(implementation, _salt(userId));
+        address wallet = TronClones.predictDeterministicAddress(implementation, _salt(userId));
         require(wallet.code.length > 0, "Factory: wallet not deployed");
         require(token != address(0), "Factory: zero token");
         Forwarder(payable(wallet)).emergencyWithdrawToken(token);
         emit EmergencyWithdraw(userId, token, motherWallet);
     }
 
-    /// @notice Emergency native token withdrawal from a specific user wallet — Owner only.
-    /// Funds are always forwarded to motherWallet (enforced inside Forwarder).
     function emergencyWithdrawNative(uint256 userId) external onlyOwner {
-        address wallet = Clones.predictDeterministicAddress(implementation, _salt(userId));
+        address wallet = TronClones.predictDeterministicAddress(implementation, _salt(userId));
         require(wallet.code.length > 0, "Factory: wallet not deployed");
         Forwarder(payable(wallet)).emergencyWithdrawNative();
         emit EmergencyWithdraw(userId, address(0), motherWallet);
     }
 
-    // ─────────────────────────────────────────
-    // Admin functions with Timelock
-    // ─────────────────────────────────────────
-
-    /// @notice Step 1: request a Mother Wallet change
-    /// Must wait 48 hours before it can be applied
     function requestMotherWalletChange(address newMotherWallet) external onlyOwner {
         require(newMotherWallet != address(0), "Factory: zero address");
         pendingMotherWallet = newMotherWallet;
@@ -153,7 +159,6 @@ contract ForwarderFactory {
         emit MotherWalletChangeRequested(newMotherWallet, motherWalletUnlockTime);
     }
 
-    /// @notice Step 2: apply the Mother Wallet change (after 48 hours)
     function applyMotherWalletChange() external onlyOwner {
         require(pendingMotherWallet != address(0), "Factory: no pending change");
         require(block.timestamp >= motherWalletUnlockTime, "Factory: timelock active");
@@ -164,7 +169,6 @@ contract ForwarderFactory {
         emit MotherWalletUpdated(old, motherWallet);
     }
 
-    /// @notice Cancel a pending Mother Wallet change before it is applied
     function cancelMotherWalletChange() external onlyOwner {
         require(pendingMotherWallet != address(0), "Factory: no pending change");
         address cancelled = pendingMotherWallet;
@@ -173,20 +177,12 @@ contract ForwarderFactory {
         emit MotherWalletChangeCancelled(cancelled);
     }
 
-    /// @notice Update the Relayer — no Timelock, lower risk
     function updateRelayer(address newRelayer) external onlyOwner {
         require(newRelayer != address(0), "Factory: zero relayer");
         emit RelayerUpdated(relayer, newRelayer);
         relayer = newRelayer;
     }
 
-    // ─────────────────────────────────────────
-    // Two-step Ownership Transfer
-    // ─────────────────────────────────────────
-
-    /// @notice Step 1 — current owner nominates a new owner.
-    /// Ownership does NOT transfer yet; the new owner must call acceptOwnership().
-    /// @param newOwner The address being nominated (e.g. a Gnosis Safe address)
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "Factory: zero owner");
         require(newOwner != owner, "Factory: already owner");
@@ -194,9 +190,6 @@ contract ForwarderFactory {
         emit OwnershipTransferStarted(owner, newOwner);
     }
 
-    /// @notice Step 2 — pending owner accepts and finalizes the transfer.
-    /// Must be called by the exact address nominated in transferOwnership().
-    /// This confirms the new owner has access to that wallet/key.
     function acceptOwnership() external {
         require(msg.sender == pendingOwner, "Factory: not pending owner");
         address old = owner;
@@ -205,8 +198,6 @@ contract ForwarderFactory {
         emit OwnershipTransferred(old, owner);
     }
 
-    /// @notice Cancel a pending ownership transfer before it is accepted.
-    /// Only the current owner can cancel.
     function cancelOwnershipTransfer() external onlyOwner {
         require(pendingOwner != address(0), "Factory: no pending transfer");
         address cancelled = pendingOwner;
