@@ -11,17 +11,17 @@ func (s *PushSettings) tokenMin(token string) (float64, bool) {
 	token = strings.ToLower(strings.TrimSpace(token))
 	for _, t := range s.Tokens {
 		if strings.EqualFold(t.Token, token) {
-			return t.MinValueTransfer, true
+			return t.MinTokenBalance, true
 		}
 	}
 	return 0, false
 }
 
 func (s *PushSettings) nativeMeetsMin(amount *big.Int, decimals int) bool {
-	if s.NativeMinValueTransfer <= 0 {
+	if s.MinNativeBalance <= 0 {
 		return amount.Sign() > 0
 	}
-	return humanAmount(amount, decimals) >= s.NativeMinValueTransfer
+	return humanAmount(amount, decimals) >= s.MinNativeBalance
 }
 
 func (s *PushSettings) tokenMeetsMin(token string, amount *big.Int, decimals int) bool {

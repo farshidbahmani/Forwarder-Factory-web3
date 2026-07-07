@@ -119,7 +119,7 @@
             "schema": {
               "type": "string",
               "examples": {
-                "evm": { "value": "0xDD281B850B8a32F2dca05f5058b6656d32C2998f" },
+                "evm": { "value": "0x345e8d47E7f0070e09ec59BE1Cd8E5059D987e64" },
                 "tron": { "value": "TWmZYKU6Tthw4Qr7eXRfSWx1YoCWN5GWVK" }
               }
             }
@@ -291,7 +291,7 @@
                   "value": {
                     "network": "bnbTestnet",
                     "functionName": "getAddress",
-                    "args": { "userId": "12345" }
+                    "args": { "userId": "1" }
                   }
                 }
               }
@@ -366,14 +366,14 @@
               "example": {
                 "network": "bnbTestnet",
                 "setting": {
-                  "nativeMinValueTransfer": 5,
+                  "minNativeBalance": 0.0001,
                   "tokens": [
-                    { "token": "0x55d398326f99059fF775485246999027B3197955", "minValueTransfer": 5 }
+                    { "token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06", "minTokenBalance": 5 }
                   ]
                 },
-                "wallets": [
-                  "0xDD281B850B8a32F2dca05f5058b6656d32C2998f"
-                ]
+                "wallets": {
+                  "1": "0x345e8d47E7f0070e09ec59BE1Cd8E5059D987e64"
+                }
               }
             }
           }
@@ -402,7 +402,7 @@
               "schema": { "$ref": "#/components/schemas/WalletRemoveRequest" },
               "example": {
                 "network": "bnbTestnet",
-                "wallets": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+                "wallets": ["1"]
               }
             }
           }
@@ -722,7 +722,7 @@
       "PushSettings": {
         "type": "object",
         "properties": {
-          "nativeMinValueTransfer": { "type": "number", "example": 5, "description": "Minimum native amount (TRX/ETH/BNB human units) before sweep" },
+          "minNativeBalance": { "type": "number", "example": 5, "description": "Minimum native amount (TRX/ETH/BNB human units) before sweep" },
           "tokens": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/TokenSetting" }
@@ -731,10 +731,10 @@
       },
       "TokenSetting": {
         "type": "object",
-        "required": ["token", "minValueTransfer"],
+        "required": ["token", "minTokenBalance"],
         "properties": {
-          "token": { "type": "string", "example": "0x55d398326f99059fF775485246999027B3197955" },
-          "minValueTransfer": { "type": "number", "example": 5 }
+          "token": { "type": "string", "example": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06" },
+          "minTokenBalance": { "type": "number", "example": 5 }
         }
       },
       "NetworkWalletRegistry": {
@@ -742,8 +742,9 @@
         "properties": {
           "setting": { "$ref": "#/components/schemas/PushSettings" },
           "wallets": {
-            "type": "array",
-            "items": { "type": "string" }
+            "type": "object",
+            "description": "Map of wallet ID to address",
+            "additionalProperties": { "type": "string" }
           }
         }
       },
@@ -755,12 +756,12 @@
             "additionalProperties": { "$ref": "#/components/schemas/NetworkWalletRegistry" },
             "example": {
               "bnbTestnet": {
-                "setting": { "nativeMinValueTransfer": 5, "tokens": [] },
-                "wallets": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+                "setting": { "minNativeBalance": 5, "tokens": [] },
+                "wallets": { "1": "0x345e8d47E7f0070e09ec59BE1Cd8E5059D987e64" }
               },
               "tronShasta": {
-                "setting": { "nativeMinValueTransfer": 5, "tokens": [] },
-                "wallets": ["TJe7vmjZBMZ9uTYQg8voyEongViN8kCs3A"]
+                "setting": { "minNativeBalance": 5, "tokens": [] },
+                "wallets": { "1": "TJe7vmjZBMZ9uTYQg8voyEongViN8kCs3A" }
               }
             }
           }
@@ -773,9 +774,10 @@
           "network": { "$ref": "#/components/schemas/NetworkName" },
           "setting": { "$ref": "#/components/schemas/PushSettings" },
           "wallets": {
-            "type": "array",
-            "items": { "type": "string" },
-            "example": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+            "type": "object",
+            "description": "Map of wallet ID to address",
+            "additionalProperties": { "type": "string" },
+            "example": { "1": "0x345e8d47E7f0070e09ec59BE1Cd8E5059D987e64" }
           }
         }
       },
@@ -786,8 +788,9 @@
           "network": { "$ref": "#/components/schemas/NetworkName" },
           "wallets": {
             "type": "array",
+            "description": "Wallet IDs or addresses to remove",
             "items": { "type": "string" },
-            "example": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+            "example": ["1"]
           }
         }
       },
@@ -810,7 +813,7 @@
           "addresses": {
             "type": "array",
             "items": { "type": "string" },
-            "example": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+            "example": ["0x345e8d47E7f0070e09ec59BE1Cd8E5059D987e64"]
           }
         }
       },
@@ -823,7 +826,7 @@
           "watchedAddresses": {
             "type": "array",
             "items": { "type": "string" },
-            "example": ["0xDD281B850B8a32F2dca05f5058b6656d32C2998f"]
+            "example": ["0x345e8d47E7f0070e09ec59BE1Cd8E5059D987e64"]
           },
           "recentSweeps": { "type": "array", "items": { "type": "object" } }
         }

@@ -3,12 +3,18 @@ package monitor
 import (
 	"sync"
 
+	"forwarder-factory/internal/apperror"
 	"forwarder-factory/internal/network"
 )
 
+type walletEntry struct {
+	original  string // address as pushed by the caller
+	canonical string // normalized form used for matching
+}
+
 type networkRegistry struct {
-	settings  PushSettings
-	addresses map[string]string // canonical -> original
+	settings PushSettings
+	wallets  map[string]walletEntry // wallet ID -> entry
 }
 
 type Registry struct {
@@ -41,6 +47,7 @@ func (r *Registry) Settings(networkName string) PushSettings {
 	return PushSettings{}
 }
 
+// Addresses returns deduplicated canonical addresses for a network.
 func (r *Registry) Addresses(networkName string) []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -48,9 +55,14 @@ func (r *Registry) Addresses(networkName string) []string {
 	if entry == nil {
 		return nil
 	}
-	out := make([]string, 0, len(entry.addresses))
-	for _, addr := range entry.addresses {
-		out = append(out, addr)
+	seen := make(map[string]struct{}, len(entry.wallets))
+	out := make([]string, 0, len(entry.wallets))
+	for _, w := range entry.wallets {
+		if _, ok := seen[w.canonical]; ok {
+			continue
+		}
+		seen[w.canonical] = struct{}{}
+		out = append(out, w.canonical)
 	}
 	return out
 }
@@ -58,11 +70,16 @@ func (r *Registry) Addresses(networkName string) []string {
 func (r *Registry) Replace(networkName string, net network.Config, req WalletPushRequest) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.networks[networkName] = &networkRegistry{
-		settings:  req.Setting,
-		addresses: map[string]string{},
+	entry := &networkRegistry{
+		settings: req.Setting,
+		wallets:  map[string]walletEntry{},
 	}
-	return r.ingestLocked(r.networks[networkName], net, req)
+	added, err := r.ingestLocked(entry, net, req)
+	if err != nil {
+		return 0, err
+	}
+	r.networks[networkName] = entry
+	return added, nil
 }
 
 func (r *Registry) Upsert(networkName string, net network.Config, req WalletPushRequest) (int, error) {
@@ -70,18 +87,25 @@ func (r *Registry) Upsert(networkName string, net network.Config, req WalletPush
 	defer r.mu.Unlock()
 	entry := r.networks[networkName]
 	if entry == nil {
-		entry = &networkRegistry{addresses: map[string]string{}}
-		r.networks[networkName] = entry
+		entry = &networkRegistry{wallets: map[string]walletEntry{}}
 	}
 	entry.settings = req.Setting
-	return r.ingestLocked(entry, net, req)
+	added, err := r.ingestLocked(entry, net, req)
+	if err != nil {
+		return 0, err
+	}
+	r.networks[networkName] = entry
+	return added, nil
 }
 
 func (r *Registry) ingestLocked(entry *networkRegistry, net network.Config, req WalletPushRequest) (int, error) {
-	added := 0
-	for _, raw := range req.Wallets {
+	affected := 0
+	for id, raw := range req.Wallets {
+		if id == "" {
+			return 0, apperror.BadRequest("wallet id must not be empty")
+		}
 		if raw == "" {
-			continue
+			return 0, apperror.BadRequest("wallet address for id \"" + id + "\" must not be empty")
 		}
 		normalized, err := normalizeForNetwork(raw, net)
 		if err != nil {
@@ -91,15 +115,16 @@ func (r *Registry) ingestLocked(entry *networkRegistry, net network.Config, req 
 		if err != nil {
 			return 0, err
 		}
-		if _, ok := entry.addresses[canonical]; !ok {
-			added++
+		if existing, ok := entry.wallets[id]; !ok || existing.canonical != canonical {
+			affected++
 		}
-		entry.addresses[canonical] = raw
+		entry.wallets[id] = walletEntry{original: raw, canonical: canonical}
 	}
-	return added, nil
+	return affected, nil
 }
 
-func (r *Registry) Remove(networkName string, net network.Config, addresses []string) (int, error) {
+// Remove deletes wallets matched by ID or by address.
+func (r *Registry) Remove(networkName string, net network.Config, wallets []string) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	entry := r.networks[networkName]
@@ -107,21 +132,27 @@ func (r *Registry) Remove(networkName string, net network.Config, addresses []st
 		return 0, nil
 	}
 	removed := 0
-	for _, raw := range addresses {
-		normalized, err := normalizeForNetwork(raw, net)
-		if err != nil {
-			return 0, err
+	for _, key := range wallets {
+		if key == "" {
+			continue
 		}
-		canonical, err := canonicalizeAddress(normalized)
-		if err != nil {
-			return 0, err
-		}
-		if _, ok := entry.addresses[canonical]; ok {
-			delete(entry.addresses, canonical)
+		if _, ok := entry.wallets[key]; ok {
+			delete(entry.wallets, key)
 			removed++
+			continue
+		}
+		canonical, err := canonicalizeAddress(key)
+		if err != nil {
+			return 0, apperror.BadRequest("\"" + key + "\" is neither a known wallet id nor a valid address")
+		}
+		for id, w := range entry.wallets {
+			if w.canonical == canonical {
+				delete(entry.wallets, id)
+				removed++
+			}
 		}
 	}
-	if len(entry.addresses) == 0 {
+	if len(entry.wallets) == 0 {
 		delete(r.networks, networkName)
 	}
 	return removed, nil
@@ -131,15 +162,31 @@ func (r *Registry) Count(networkName string) int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if entry := r.networks[networkName]; entry != nil {
-		return len(entry.addresses)
+		return len(entry.wallets)
 	}
 	return 0
 }
 
+// WalletID resolves a canonical address back to its wallet ID.
+func (r *Registry) WalletID(networkName, canonical string) (string, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	entry := r.networks[networkName]
+	if entry == nil {
+		return "", false
+	}
+	for id, w := range entry.wallets {
+		if w.canonical == canonical {
+			return id, true
+		}
+	}
+	return "", false
+}
+
 func (nr *networkRegistry) view() NetworkWalletRegistry {
-	wallets := make([]string, 0, len(nr.addresses))
-	for _, addr := range nr.addresses {
-		wallets = append(wallets, addr)
+	wallets := make(map[string]string, len(nr.wallets))
+	for id, w := range nr.wallets {
+		wallets[id] = w.original
 	}
 	return NetworkWalletRegistry{
 		Setting: nr.settings,

@@ -18,6 +18,7 @@ import (
 const maxRecentSweeps = 50
 
 type SweepResult struct {
+	WalletID    string      `json:"walletId,omitempty"`
 	Address     string      `json:"address"`
 	Type        DepositType `json:"type"`
 	TxHash      string      `json:"txHash"`
@@ -171,11 +172,25 @@ func (s *Service) refreshRunningMonitor(ctx context.Context, networkName string)
 	st.mu.Unlock()
 	if st.evmListener != nil {
 		st.evmListener.UpdateAddresses(watchedToEVMMap(watched))
+		st.evmListener.UpdateTokens(s.tokenAddresses(networkName))
 	}
 	if st.tronListener != nil {
 		st.tronListener.UpdateAddresses(watchedToTronMap(watched))
 	}
 	return []NetworkStatus{*st.status()}, nil
+}
+
+// tokenAddresses returns the token contracts configured in the network's
+// settings, used to scope EVM log filters.
+func (s *Service) tokenAddresses(networkName string) []common.Address {
+	settings := s.registry.Settings(networkName)
+	out := make([]common.Address, 0, len(settings.Tokens))
+	for _, t := range settings.Tokens {
+		if common.IsHexAddress(t.Token) {
+			out = append(out, common.HexToAddress(t.Token))
+		}
+	}
+	return out
 }
 
 func watchedToEVMMap(watched []string) map[common.Address]string {
@@ -300,7 +315,7 @@ func (s *Service) startEVM(ctx context.Context, networkName string, net network.
 		return err
 	}
 	st.evmClient = client
-	st.evmListener = NewListener(networkName, client, addrMap, func(ev DepositEvent) {
+	st.evmListener = NewListener(networkName, client, addrMap, s.tokenAddresses(networkName), func(ev DepositEvent) {
 		s.handleDeposit(ctx, networkName, st, ev)
 	})
 	return st.evmListener.Start(ctx)
@@ -358,8 +373,9 @@ func (s *Service) handleDeposit(ctx context.Context, networkName string, st *net
 	net, _ := network.Get(networkName)
 	settings := s.registry.Settings(networkName)
 
-	sweep := SweepResult{Address: ev.Address, Type: ev.Type, TxHash: ev.TxHash}
-	log.Printf("[monitor:%s] deposit: address=%s type=%s tx=%s", networkName, ev.Address, ev.Type, ev.TxHash)
+	walletID, _ := s.registry.WalletID(networkName, ev.Address)
+	sweep := SweepResult{WalletID: walletID, Address: ev.Address, Type: ev.Type, TxHash: ev.TxHash}
+	log.Printf("[monitor:%s] deposit: walletId=%s address=%s type=%s tx=%s", networkName, walletID, ev.Address, ev.Type, ev.TxHash)
 
 	if ev.Type == DepositNative {
 		if !settings.nativeMeetsMin(ev.Amount, nativeDecimals(net)) {
@@ -376,9 +392,17 @@ func (s *Service) handleDeposit(ctx context.Context, networkName string, st *net
 	var res *contract.CallResult
 	var err error
 	if ev.Type == DepositNative {
-		res, err = s.contracts.Call(ctx, networkName, "sweepNative", map[string]string{"wallet": ev.Address})
+		if walletID == "" {
+			log.Printf("[monitor:%s] skip native deposit: no walletId for address=%s", networkName, ev.Address)
+			return
+		}
+		res, err = s.contracts.Call(ctx, networkName, "deployAndSweepNative", map[string]string{"userId": walletID})
 	} else {
-		res, err = s.contracts.Call(ctx, networkName, "sweepToken", map[string]string{"wallet": ev.Address, "token": ev.Token})
+		if walletID == "" {
+			log.Printf("[monitor:%s] skip token deposit: no walletId for address=%s token=%s", networkName, ev.Address, ev.Token)
+			return
+		}
+		res, err = s.contracts.Call(ctx, networkName, "deployAndSweepToken", map[string]string{"userId": walletID, "token": ev.Token})
 	}
 	if err != nil {
 		msg := err.Error()
